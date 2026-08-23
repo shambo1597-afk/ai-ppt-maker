@@ -99,5 +99,8 @@ export function getIconSvgDataUrl(
   // We can construct a standard crisp SVG
   const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="${cleanColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
 
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svgString)}`;
+  // pptxgenjs's addImage() requires a base64-encoded data URL (a plain
+  // URI-encoded one renders fine in an <img> but is silently rejected on
+  // export), so this always base64-encodes.
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
 }

@@ -70,11 +70,19 @@ export async function fetchIconifySvg(iconName: string, color: string = '#B85042
 }
 
 /**
- * Generate a clean Data URL for embedding into native PPTX or <img> elements
+ * Generate a Data URL for embedding into native PPTX or <img> elements.
+ * pptxgenjs's addImage() specifically requires a base64-encoded data URL
+ * (a plain URI-encoded one renders fine in an <img> but is silently
+ * rejected on export), so this always base64-encodes.
  */
 export async function getIconDataUrl(iconName: string, color: string = '#B85042'): Promise<string> {
   const svg = await fetchIconifySvg(iconName, color);
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;base64,${utf8ToBase64(svg)}`;
+}
+
+/** UTF-8-safe base64 encoding for browser (and Node 18+, which also has global btoa). */
+function utf8ToBase64(str: string): string {
+  return btoa(unescape(encodeURIComponent(str)));
 }
 
 /**

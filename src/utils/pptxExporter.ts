@@ -1,6 +1,7 @@
 import pptxgen from 'pptxgenjs';
 import { Slide, SlideElement, TextElement, ShapeElement, StatCardElement, TableElement, ImageElement, IconElement, CodeElement } from '../types/slide';
 import { getIconSvgDataUrl } from './iconHelper';
+import { blobPathToPptxPoints } from '../lib/engine/organicShapes';
 
 // Convert CSS Hex color (#rrggbb or #rgb) to PPTX 6-char hex without #
 export const cleanHexColor = (hex: string): string => {
@@ -32,6 +33,16 @@ const toH = (ph: number): number => parseFloat(((ph / CANVAS_H) * 5.625).toFixed
 const PX_TO_PT = 405 / CANVAS_H;
 const toFontSizePt = (fontPx: number) => Math.max(8, Math.round(fontPx * PX_TO_PT));
 const toPt = (px: number) => parseFloat((px * PX_TO_PT).toFixed(2));
+
+// Every SlideElement carries a top-level `opacity` (BaseElement.opacity) —
+// PPTX has no single "element opacity" knob, so this converts it to
+// whichever PowerPoint transparency percentage applies to that element
+// type (optionally combined with a fill/image's own alpha, since the two
+// are independent and multiply).
+const toTransparencyPercent = (...alphas: Array<number | undefined>): number => {
+  const combined = alphas.reduce<number>((acc, a) => acc * (a ?? 1), 1);
+  return Math.max(0, Math.min(100, Math.round((1 - combined) * 100)));
+};
 
 /**
  * Generate and download a native .pptx PowerPoint presentation
@@ -126,6 +137,7 @@ async function renderElementToPptx(
         rotate: textEl.rotation || 0,
         margin: textEl.padding ? toPt(textEl.padding) : 0,
         wrap: true,
+        transparency: toTransparencyPercent(textEl.opacity),
       };
 
       // Match the canvas renderer's CSS letter-spacing / line-height exactly
@@ -150,6 +162,36 @@ async function renderElementToPptx(
 
     case 'shape': {
       const shapeEl = el as ShapeElement;
+
+      if (shapeEl.shapeType === 'blob' && shapeEl.blobPoints && shapeEl.blobPoints.length > 0) {
+        // pptxgenjs's runtime genuinely supports freeform/custom-geometry
+        // shapes (dist/pptxgen.cjs.js: SHAPE_TYPE.CUSTOM_GEOMETRY ===
+        // 'custGeom', with a `points` array driving real <a:custGeom> XML)
+        // — its public .d.ts's ShapeType/SHAPE_NAME unions just haven't
+        // been updated to list it, hence the casts below.
+        const points = blobPathToPptxPoints(shapeEl.blobPoints, w, h);
+        slide.addShape('custGeom' as unknown as pptxgen.SHAPE_NAME, {
+          x,
+          y,
+          w,
+          h,
+          rotate: shapeEl.rotation || 0,
+          points: points as unknown as pptxgen.ShapeProps['points'],
+          fill: {
+            color: cleanHexColor(shapeEl.fillColor || '#ffffff'),
+            transparency: toTransparencyPercent(shapeEl.fillOpacity, shapeEl.opacity),
+          },
+          line:
+            shapeEl.borderWidth > 0 && shapeEl.borderColor
+              ? {
+                  color: cleanHexColor(shapeEl.borderColor),
+                  width: Math.max(0.5, toPt(shapeEl.borderWidth)),
+                }
+              : { width: 0, color: '000000', transparency: 100 },
+        });
+        break;
+      }
+
       let pptxShapeType = pres.ShapeType.rect;
 
       if (shapeEl.shapeType === 'roundRect' || shapeEl.shapeType === 'pill') {
@@ -174,7 +216,7 @@ async function renderElementToPptx(
         rotate: shapeEl.rotation || 0,
         fill: {
           color: cleanHexColor(shapeEl.fillColor || '#ffffff'),
-          transparency: Math.round((1 - (shapeEl.fillOpacity ?? 1)) * 100),
+          transparency: toTransparencyPercent(shapeEl.fillOpacity, shapeEl.opacity),
         },
       };
 
@@ -332,6 +374,7 @@ async function renderElementToPptx(
           w,
           h,
           rotate: imgEl.rotation || 0,
+          transparency: toTransparencyPercent(imgEl.opacity),
         });
       } catch (err) {
         console.warn('Failed to embed image in PPTX:', err);

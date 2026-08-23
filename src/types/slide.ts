@@ -35,11 +35,34 @@ export interface TextElement extends BaseElement {
   shadow?: boolean;
 }
 
-export type ShapeType = 'rect' | 'roundRect' | 'circle' | 'pill' | 'triangle' | 'line' | 'arrow' | 'diamond';
+export type ShapeType = 'rect' | 'roundRect' | 'circle' | 'pill' | 'triangle' | 'line' | 'arrow' | 'diamond' | 'blob';
+
+/**
+ * A point on an organic freeform path, normalized to a 0..1 unit box
+ * relative to the element's own width/height. `curve` (when present)
+ * describes a cubic Bezier from the previous point through this one;
+ * omitting it draws a straight line instead. The first point is always an
+ * implicit move-to. Renderers scale these by the element's actual
+ * width/height — in px for the canvas (ElementRenderer's inline SVG) and
+ * in inches for the PPTX export (pptxgenjs custGeom) — so both draw the
+ * exact same silhouette.
+ */
+export interface BlobPoint {
+  x: number;
+  y: number;
+  curve?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+}
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
   shapeType: ShapeType;
+  /** Required when shapeType === 'blob': a closed organic path, see BlobPoint. */
+  blobPoints?: BlobPoint[];
   fillColor: string;
   fillOpacity: number;
   gradient?: {
