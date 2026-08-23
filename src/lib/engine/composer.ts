@@ -1,9 +1,10 @@
 import { SlideElement, TextElement, ShapeElement, ImageElement, IconElement } from '../../types/slide';
 import { ThemeTokens } from '../design/tokens';
+import { mixHex } from '../design/colorMath';
 import { SlideContent, SlideBullet } from './contentModel';
 import { Box, CANVAS_H, getContentBox, stackGap, splitBox, computeGrid } from './grid';
 import { autoFitFontSize, baseTitleSize, baseBodySize, estimateTextHeight } from './typography';
-import { generatePosterGraphic } from './poster';
+import { generatePosterGraphic, generateAmbientBlobs, PosterPalette } from './poster';
 
 /**
  * ============================================================================
@@ -97,12 +98,19 @@ function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
   return {
     isHero,
     fg: isHero ? theme.textHero : theme.textPrimary,
-    muted: isHero ? 'rgba(255,255,255,0.65)' : theme.textMuted,
+    // Every color in the scene graph must be a plain hex the PPTX exporter
+    // can round-trip — no rgba()/CSS color functions — so "muted white on
+    // a dark hero surface" is a real blended hex, not an alpha channel.
+    muted: isHero ? mixHex('#FFFFFF', theme.heroBg, 0.35) : theme.textMuted,
     accent: theme.accent,
     accentBadge: theme.accentBadge || theme.accent,
     fontHeading: theme.fontHeading,
     fontBody: theme.fontBody,
   };
+}
+
+function toPosterPalette(surface: Surface): PosterPalette {
+  return { accent: surface.accent, accentBadge: surface.accentBadge, textPrimary: surface.fg, fontHeading: surface.fontHeading };
 }
 
 /** A slide is composed on the hero (dark, high-energy) surface when it's the
@@ -192,7 +200,7 @@ function composeIconBadge(box: Box, content: SlideContent, surface: Surface, z: 
 // Regime: TITLE — the deck's opening monumental poster slide.
 // ---------------------------------------------------------------------------
 function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = [];
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
   let z = 1;
 
   if (content.eyebrow) {
@@ -306,8 +314,8 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
       width: box.width,
       height: 1,
       shapeType: 'line',
-      fillColor: 'rgba(255,255,255,0.15)',
-      opacity: 0.6,
+      fillColor: '#FFFFFF',
+      opacity: 0.15,
       zIndex: 1,
     })
   );
@@ -334,7 +342,7 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
 // Regime: QUOTE — a standalone, centered editorial breather.
 // ---------------------------------------------------------------------------
 function composeQuote(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = [];
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
   const quoteWidth = Math.round(box.width * 0.74);
   const quoteX = box.x + Math.round((box.width - quoteWidth) / 2);
   let cursorY = box.y + Math.round(box.height * 0.12);
@@ -524,7 +532,7 @@ function composeMediaSplit(content: SlideContent, box: Box, surface: Surface): S
 // Regime: STAT — a single dominant metric paired with narrative context.
 // ---------------------------------------------------------------------------
 function composeStat(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = [];
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
   const [leftBox, rightBox] = computeGrid(2, box, 2);
 
   elements.push(
@@ -638,7 +646,7 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
 // column count and card size are computed from the actual bullet count.
 // ---------------------------------------------------------------------------
 function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = [];
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
   const header = composeHeaderRow(box, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(box, content, surface, 1));
 
@@ -777,15 +785,7 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
   const graphicFirst = content.index % 2 === 0;
   const { media: graphicBox, text: textBox } = splitBox(box, graphicFirst);
 
-  elements.push(
-    ...generatePosterGraphic(
-      graphicBox,
-      { accent: surface.accent, accentBadge: surface.accentBadge, textPrimary: surface.fg, fontHeading: surface.fontHeading },
-      content.index,
-      !graphicFirst,
-      0
-    )
-  );
+  elements.push(...generatePosterGraphic(graphicBox, toPosterPalette(surface), content.index, !graphicFirst, 0));
 
   const header = composeHeaderRow(textBox, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(textBox, content, surface, 1));

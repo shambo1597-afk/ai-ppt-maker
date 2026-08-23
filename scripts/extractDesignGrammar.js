@@ -85,6 +85,53 @@ function contrastRatio(hexA, hexB) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+function hexToHsl(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+  const r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+  else if (max === g) h = ((b - r) / d + 2) * 60;
+  else h = ((r - g) / d + 4) * 60;
+  return { h, s, l };
+}
+
+/** Smallest signed angular distance from a to b, in degrees, in (-180, 180]. */
+function hueDelta(a, b) {
+  let d = (b - a) % 360;
+  if (d > 180) d -= 360;
+  if (d <= -180) d += 360;
+  return d;
+}
+
+/**
+ * Mine real two-color gradient pairs straight out of a slide's raw XML.
+ * Real Canva decks turn out to use `<a:gradFill>` almost exclusively on
+ * headline text runs and decorative shape strokes, not on shape fills or
+ * slide backgrounds — so this is a plain regex sweep over the file rather
+ * than a full spPr/rPr tree walk: every `<a:gradFill>...</a:gradFill>`
+ * block's two `<a:srgbClr>` stops plus its `<a:lin ang="…">` (60,000ths of
+ * a degree) angle, wherever it appears.
+ */
+function extractGradientPairs(xmlRaw) {
+  const pairs = [];
+  const blockRe = /<a:gradFill[^>]*>[\s\S]*?<\/a:gradFill>/g;
+  let block;
+  while ((block = blockRe.exec(xmlRaw))) {
+    const stops = [...block[0].matchAll(/<a:srgbClr val="([0-9A-Fa-f]{6})"/g)].map((m) => `#${m[1].toUpperCase()}`);
+    if (stops.length < 2) continue;
+    const angMatch = block[0].match(/<a:lin ang="(-?\d+)"/);
+    const angleDeg = angMatch ? Math.round((parseInt(angMatch[1], 10) / 60000) * 10) / 10 : 90;
+    pairs.push({ from: stops[0], to: stops[stops.length - 1], angleDeg });
+  }
+  return pairs;
+}
+
 /**
  * Extract every text/shape/picture element from one slide's XML into
  * flat geometry + typography records (px in a 1920x1080 canvas space).
@@ -196,6 +243,7 @@ async function main() {
   const imageColumnRatios = [];
   const textBlockCounts = [];
   const contrastPairCounts = new Map(); // "bg|fg" -> { bg, fg, contrast, count }
+  const gradientPairCounts = new Map(); // "from|to" -> { from, to, angleDeg: [...], count }
 
   let slideCount = 0;
 
@@ -231,15 +279,34 @@ async function main() {
 
     for (const entry of slideEntries) {
       let parsedSlide;
+      let rawXml = '';
       try {
-        const xml = entry.getData().toString('utf8');
-        parsedSlide = await parseSlideShapes(xml, slideWidthEmu, slideHeightEmu);
+        rawXml = entry.getData().toString('utf8');
+        parsedSlide = await parseSlideShapes(rawXml, slideWidthEmu, slideHeightEmu);
       } catch (err) {
         console.warn(`  ! Failed to parse ${entry.entryName} in "${file}": ${err.message}`);
         continue;
       }
       if (!parsedSlide) continue;
       slideCount += 1;
+
+      // Real gradient color-stop pairs actually used in this slide (mostly
+      // headline text and decorative shape strokes in practice — see
+      // extractGradientPairs()), kept only when both stops are legible
+      // against each other (skip near-duplicate stops that aren't really a
+      // gradient).
+      extractGradientPairs(rawXml).forEach(({ from, to, angleDeg }) => {
+        if (from === to) return;
+        if (contrastRatio(from, to) < 1.15) return;
+        const key = `${from}|${to}`;
+        const existing = gradientPairCounts.get(key);
+        if (existing) {
+          existing.count += 1;
+          existing.angles.push(angleDeg);
+        } else {
+          gradientPairCounts.set(key, { from, to, angles: [angleDeg], count: 1 });
+        }
+      });
 
       const { background, textShapes, pictures } = parsedSlide;
 
@@ -331,6 +398,67 @@ async function main() {
     .sort((a, b) => b.count - a.count || b.contrast - a.contrast)
     .slice(0, 16);
 
+  // OOXML's linear-gradient angle is a full 360° vector; our renderer only
+  // needs 4 buckets (a gradient reversed 180° with its stops swapped is the
+  // same gradient), so fold each mined angle into [0, 180) and bucket it.
+  function bucketDirection(angleDeg, from, to) {
+    let a = ((angleDeg % 360) + 360) % 360;
+    let stops = { from, to };
+    if (a >= 180) {
+      a -= 180;
+      stops = { from: to, to: from };
+    }
+    let direction = 'to-r';
+    if (a >= 22.5 && a < 67.5) direction = 'to-br';
+    else if (a >= 67.5 && a < 112.5) direction = 'to-b';
+    else if (a >= 112.5 && a < 157.5) direction = 'to-bl';
+    return { direction, from: stops.from, to: stops.to };
+  }
+
+  const gradientPairs = [...gradientPairCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12)
+    .map(({ from, to, angles, count }) => {
+      const { direction, from: f, to: t } = bucketDirection(median(angles) ?? 45, from, to);
+      return { from: f, to: t, direction, count };
+    });
+
+  // The literal mined hex pairs are one deck's palette (blue), not
+  // something to replay on every theme — so also learn the structural
+  // *relationship* between a gradient's two stops in HSL space (real Canva
+  // gradients turn out to be "darker/saturated base -> lighter tint of the
+  // same hue"), which the composer can re-apply to any theme's own accent
+  // color instead of literally reusing these blues.
+  const hueShifts = [];
+  const lightnessDeltas = [];
+  const saturationDeltas = [];
+  [...gradientPairCounts.values()].forEach(({ from, to, count }) => {
+    const hslFrom = hexToHsl(from);
+    const hslTo = hexToHsl(to);
+    if (!hslFrom || !hslTo) return;
+    for (let i = 0; i < count; i++) {
+      // Hue is undefined on a near-achromatic stop (e.g. a "-> white"
+      // tint) — including those would inject a meaningless ~180° "shift"
+      // artifact, so only sample hue drift between two stops that both
+      // still carry real color.
+      if (hslFrom.s > 0.08 && hslTo.s > 0.08) {
+        hueShifts.push(hueDelta(hslFrom.h, hslTo.h));
+      }
+      lightnessDeltas.push(hslTo.l - hslFrom.l);
+      saturationDeltas.push(hslTo.s - hslFrom.s);
+    }
+  });
+
+  const gradientRule = {
+    // How much lighter/darker and more/less saturated the second stop is
+    // than the first, and by how many degrees its hue drifts — applied to
+    // a theme's own base color rather than replaying a fixed palette.
+    hueShiftDeg: Math.round((median(hueShifts) ?? 6) * 10) / 10,
+    lightnessDelta: Math.round((median(lightnessDeltas) ?? 0.32) * 1000) / 1000,
+    saturationDelta: Math.round((median(saturationDeltas) ?? -0.15) * 1000) / 1000,
+    direction: gradientPairs[0]?.direction ?? 'to-br',
+  };
+
   const grammar = {
     version: '1.0.0',
     generatedAt: new Date().toISOString(),
@@ -358,6 +486,8 @@ async function main() {
       medianTextBlocksPerSlide: Math.round(median(textBlockCounts) ?? 4),
     },
     contrastPairs,
+    gradientPairs,
+    gradientRule,
   };
 
   const outDir = path.dirname(OUTPUT_FILE);

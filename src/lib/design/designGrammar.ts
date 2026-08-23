@@ -1,4 +1,5 @@
 import grammarJson from './designGrammar.json';
+import { hexToHsl, hslToHex } from './colorMath';
 
 /**
  * Design Grammar — spatial math mined from the real Canva decks in
@@ -12,6 +13,28 @@ export interface ContrastPair {
   fg: string;
   contrast: number;
   count: number;
+}
+
+export type GradientDirection = 'to-r' | 'to-br' | 'to-b' | 'to-bl';
+
+export interface GradientPair {
+  from: string;
+  to: string;
+  direction: GradientDirection;
+  count: number;
+}
+
+/**
+ * The learned *structure* of a real Canva gradient — how much lighter,
+ * less saturated, and hue-shifted the second stop tends to be relative to
+ * the first — rather than a literal palette. deriveGradient() re-applies
+ * this rule to any theme's own base color.
+ */
+export interface GradientRule {
+  hueShiftDeg: number;
+  lightnessDelta: number;
+  saturationDelta: number;
+  direction: GradientDirection;
 }
 
 export interface DesignGrammar {
@@ -37,6 +60,8 @@ export interface DesignGrammar {
     medianTextBlocksPerSlide: number;
   };
   contrastPairs: ContrastPair[];
+  gradientPairs: GradientPair[];
+  gradientRule: GradientRule;
 }
 
 /** Sane fallback in case the extracted JSON is ever missing/malformed. */
@@ -54,6 +79,8 @@ const FALLBACK_GRAMMAR: DesignGrammar = {
     { bg: '#F4F6F9', fg: '#0F172A', contrast: 14, count: 1 },
     { bg: '#080E1E', fg: '#FFFFFF', contrast: 18, count: 1 },
   ],
+  gradientPairs: [{ from: '#478CF6', to: '#FFFFFF', direction: 'to-br', count: 1 }],
+  gradientRule: { hueShiftDeg: -7, lightnessDelta: 0.38, saturationDelta: -0.9, direction: 'to-br' },
 };
 
 function isValidGrammar(input: unknown): input is DesignGrammar {
@@ -64,7 +91,9 @@ function isValidGrammar(input: unknown): input is DesignGrammar {
       g.typeScale &&
       g.spacing &&
       typeof g.imageColumnRatio === 'number' &&
-      Array.isArray(g.contrastPairs)
+      Array.isArray(g.contrastPairs) &&
+      Array.isArray(g.gradientPairs) &&
+      g.gradientRule
   );
 }
 
@@ -83,4 +112,33 @@ export function pickContrastPair(preferBg?: string): ContrastPair {
     if (match) return match;
   }
   return pairs[0];
+}
+
+export interface DerivedGradient {
+  from: string;
+  to: string;
+  direction: GradientDirection;
+}
+
+/**
+ * Apply the mined gradient *rule* (lighten/desaturate/hue-drift the second
+ * stop by roughly what real Canva gradients do) to a theme's own base
+ * color, instead of replaying the literal blue palette that rule was mined
+ * from. `intensity` scales the effect (1 = the rule as mined, 0.5 = half
+ * as dramatic) for softer background washes vs. bolder accent moments.
+ */
+export function deriveGradient(baseHex: string, intensity: number = 1): DerivedGradient {
+  const rule = DESIGN_GRAMMAR.gradientRule;
+  const base = hexToHsl(baseHex);
+  if (!base) {
+    return { from: baseHex, to: baseHex, direction: rule.direction };
+  }
+
+  const to = hslToHex({
+    h: base.h + rule.hueShiftDeg * intensity,
+    s: Math.max(0.04, Math.min(1, base.s + rule.saturationDelta * intensity)),
+    l: Math.max(0.02, Math.min(0.97, base.l + rule.lightnessDelta * intensity)),
+  });
+
+  return { from: baseHex, to, direction: rule.direction };
 }

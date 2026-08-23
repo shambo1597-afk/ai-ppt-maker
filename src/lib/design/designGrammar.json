@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-08-23T18:20:37.065Z",
+  "generatedAt": "2026-08-23T18:50:20.874Z",
   "sourceDeckCount": 10,
   "sourceSlideCount": 120,
   "margins": {
@@ -111,5 +111,37 @@
       "contrast": 4.35,
       "count": 1
     }
-  ]
+  ],
+  "gradientPairs": [
+    {
+      "from": "#478CF6",
+      "to": "#FFFFFF",
+      "direction": "to-br",
+      "count": 63
+    },
+    {
+      "from": "#478CF6",
+      "to": "#C1E1FF",
+      "direction": "to-br",
+      "count": 45
+    },
+    {
+      "from": "#23539D",
+      "to": "#A7C3E8",
+      "direction": "to-br",
+      "count": 6
+    },
+    {
+      "from": "#23539D",
+      "to": "#D3E6FF",
+      "direction": "to-br",
+      "count": 1
+    }
+  ],
+  "gradientRule": {
+    "hueShiftDeg": -7.3,
+    "lightnessDelta": 0.378,
+    "saturationDelta": -0.907,
+    "direction": "to-br"
+  }
 }

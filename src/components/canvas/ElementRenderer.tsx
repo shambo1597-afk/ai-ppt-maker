@@ -12,6 +12,7 @@ import {
 } from '../../types/slide';
 import { useSlideStore } from '../../store/useSlideStore';
 import { DynamicLucideIcon } from '../../utils/iconHelper';
+import { blobPathToSvgD } from '../../lib/engine/organicShapes';
 import { TransformHandle } from './TransformHandle';
 import { ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
 
@@ -334,6 +335,27 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
                 }}
               />
             </div>
+          );
+        }
+
+        if (el.shapeType === 'blob' && el.blobPoints && el.blobPoints.length > 0) {
+          const d = blobPathToSvgD(el.blobPoints, el.width, el.height);
+          return (
+            <svg
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${el.width} ${el.height}`}
+              style={{ overflow: 'visible' }}
+              preserveAspectRatio="none"
+            >
+              <path
+                d={d}
+                fill={el.fillColor}
+                fillOpacity={el.fillOpacity ?? 1}
+                stroke={el.borderWidth > 0 ? el.borderColor : 'none'}
+                strokeWidth={el.borderWidth || 0}
+              />
+            </svg>
           );
         }
 
