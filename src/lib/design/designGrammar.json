@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-08-23T18:50:20.874Z",
+  "generatedAt": "2026-08-23T19:09:46.332Z",
   "sourceDeckCount": 10,
   "sourceSlideCount": 120,
   "margins": {
@@ -143,5 +143,86 @@
     "lightnessDelta": 0.378,
     "saturationDelta": -0.907,
     "direction": "to-br"
+  },
+  "fontPairing": {
+    "singleFamilyRatio": 0.4,
+    "displayWeightCounts": {
+      "regular": 5,
+      "light": 1,
+      "bold": 4
+    },
+    "sampleCount": 10,
+    "samples": [
+      {
+        "sourceFile": "Blue Bold Project Proposal Presentation.pptx",
+        "displayFont": "Buongiorno Rastellino",
+        "bodyFont": "Aileron",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Blue Modern Business Pitch Deck Presentation.pptx",
+        "displayFont": "Neue Montreal Medium",
+        "bodyFont": "Neue Montreal Bold",
+        "sameFamily": true,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Blue and Black Minimalist Business Presentation.pptx",
+        "displayFont": "Bricolage Grotesque",
+        "bodyFont": "Open Sauce",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Cybersecurity Roadmap Illustrative Green Presentation.pptx",
+        "displayFont": "Anton",
+        "bodyFont": "Poppins",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Dark Blue Gradient Modern Professional Presentation.pptx",
+        "displayFont": "Poppins Light",
+        "bodyFont": "Poppins",
+        "sameFamily": true,
+        "displayWeight": "light"
+      },
+      {
+        "sourceFile": "Green and Black Modern Fintech Evolution Presentation.pptx",
+        "displayFont": "TT Hoves Bold",
+        "bodyFont": "Open Sans",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Green and White Modern Biotechnology Presentation.pptx",
+        "displayFont": "Telegraf Bold",
+        "bodyFont": "Telegraf",
+        "sameFamily": true,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Grey Bold Minimalist Project Proposal Presentation.pptx",
+        "displayFont": "Aileron Heavy",
+        "bodyFont": "Work Sans",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Red and Beige Bold Modern Professional Business Pitch Deck Presentation.pptx",
+        "displayFont": "Inter Bold",
+        "bodyFont": "Inter",
+        "sameFamily": true,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Red and Black Modern Clean Cyber Security Presentation.pptx",
+        "displayFont": "AC Steelfish",
+        "bodyFont": "Roboto Condensed",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      }
+    ]
   }
 }

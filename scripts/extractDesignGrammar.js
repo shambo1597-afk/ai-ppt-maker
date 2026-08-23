@@ -132,6 +132,43 @@ function extractGradientPairs(xmlRaw) {
   return pairs;
 }
 
+// Canva/PowerPoint frequently exports weight/style variants of one family
+// as separate "typeface" names (e.g. "Poppins", "Poppins Light", "Poppins
+// Bold") rather than a single family name plus a bold flag. Stripping
+// these suffixes is what lets us tell a genuine two-typeface pairing
+// apart from one family used at several weights.
+const WEIGHT_SUFFIXES = [
+  'extra-light', 'extralight', 'semi-bold', 'semibold', 'ultra-bold',
+  'heavy', 'black', 'bold', 'light', 'medium', 'thin', 'regular',
+  'italics', 'italic', 'condensed',
+];
+
+function normalizeFontBase(name) {
+  if (!name) return name;
+  let base = name.trim();
+  // Repeatedly strip a trailing weight/style word (handles "X Extra-Light",
+  // "X Medium Italics", etc).
+  let stripped = true;
+  while (stripped) {
+    stripped = false;
+    for (const suffix of WEIGHT_SUFFIXES) {
+      const re = new RegExp(`\\s+${suffix}$`, 'i');
+      if (re.test(base)) {
+        base = base.replace(re, '').trim();
+        stripped = true;
+      }
+    }
+  }
+  return base || name;
+}
+
+function classifyWeight(name) {
+  const lower = (name || '').toLowerCase();
+  if (/\b(extra-?light|thin|hairline|light)\b/.test(lower)) return 'light';
+  if (/\b(black|heavy|ultra-?bold|bold)\b/.test(lower)) return 'bold';
+  return 'regular';
+}
+
 /**
  * Extract every text/shape/picture element from one slide's XML into
  * flat geometry + typography records (px in a 1920x1080 canvas space).
@@ -176,6 +213,7 @@ async function parseSlideShapes(slideXmlStr, slideWidthEmu, slideHeightEmu) {
       if (!txBody) return; // grammar cares about typography-bearing shapes
 
       let fontSize;
+      let fontFamily;
       let color;
       let charCount = 0;
       const paragraphs = Array.isArray(txBody['a:p']) ? txBody['a:p'] : txBody['a:p'] ? [txBody['a:p']] : [];
@@ -189,7 +227,10 @@ async function parseSlideShapes(slideXmlStr, slideWidthEmu, slideHeightEmu) {
             if (rPr['sz']) {
               const sz = Math.round(parseInt(rPr['sz'], 10) / 100);
               // Track the largest run size in the shape as its representative size
-              if (!fontSize || sz > fontSize) fontSize = sz;
+              if (!fontSize || sz > fontSize) {
+                fontSize = sz;
+                if (rPr['a:latin']?.['typeface']) fontFamily = rPr['a:latin']['typeface'];
+              }
             }
             if (rPr['a:solidFill']?.['a:srgbClr']?.['val'] && !color) {
               color = `#${rPr['a:solidFill']['a:srgbClr']['val']}`.toUpperCase();
@@ -199,7 +240,7 @@ async function parseSlideShapes(slideXmlStr, slideWidthEmu, slideHeightEmu) {
       });
 
       if (!fontSize || charCount === 0) return;
-      textShapes.push({ x, y, width, height, fontSize, color, charCount });
+      textShapes.push({ x, y, width, height, fontSize, fontFamily, color, charCount });
     } catch {
       // skip malformed shape
     }
@@ -244,6 +285,7 @@ async function main() {
   const textBlockCounts = [];
   const contrastPairCounts = new Map(); // "bg|fg" -> { bg, fg, contrast, count }
   const gradientPairCounts = new Map(); // "from|to" -> { from, to, angleDeg: [...], count }
+  const fontPairingSamples = []; // one entry per deck: { displayFont, bodyFont, sameFamily, displayWeight }
 
   let slideCount = 0;
 
@@ -276,6 +318,11 @@ async function main() {
     const slideEntries = zip
       .getEntries()
       .filter((e) => e.entryName.startsWith('ppt/slides/slide') && e.entryName.endsWith('.xml'));
+
+    // Per-deck font usage: which raw typeface name carries the most volume
+    // at each size, so we can tell this deck's display face from its body
+    // face and whether they're really the same family at different weights.
+    const deckFontStats = new Map(); // rawFontName -> { chars, maxSize }
 
     for (const entry of slideEntries) {
       let parsedSlide;
@@ -336,6 +383,14 @@ async function main() {
         titleToBodyRatios.push(title.fontSize / body.fontSize);
       }
 
+      contentShapes.forEach((s) => {
+        if (!s.fontFamily || !s.charCount) return;
+        const entry = deckFontStats.get(s.fontFamily) || { chars: 0, maxSize: 0 };
+        entry.chars += s.charCount;
+        entry.maxSize = Math.max(entry.maxSize, s.fontSize);
+        deckFontStats.set(s.fontFamily, entry);
+      });
+
       // Stack rhythm: vertically adjacent shapes sharing a column
       for (let i = 0; i < contentShapes.length; i++) {
         for (let j = 0; j < contentShapes.length; j++) {
@@ -385,6 +440,25 @@ async function main() {
           }
         }
       }
+    }
+
+    // This deck's display face (largest size seen) vs. its body face
+    // (highest character volume among everything else) — and whether
+    // they're actually the same family at a different weight.
+    if (deckFontStats.size > 0) {
+      const byMaxSize = [...deckFontStats.entries()].sort((a, b) => b[1].maxSize - a[1].maxSize);
+      const [displayFontRaw] = byMaxSize[0];
+      const byChars = [...deckFontStats.entries()].sort((a, b) => b[1].chars - a[1].chars);
+      const bodyEntry = byChars.find(([name]) => name !== displayFontRaw) || byChars[0];
+      const bodyFontRaw = bodyEntry[0];
+
+      fontPairingSamples.push({
+        sourceFile: file,
+        displayFont: displayFontRaw,
+        bodyFont: bodyFontRaw,
+        sameFamily: normalizeFontBase(displayFontRaw) === normalizeFontBase(bodyFontRaw),
+        displayWeight: classifyWeight(displayFontRaw),
+      });
     }
 
     console.log(`  ✓ Parsed "${file}" (${slideEntries.length} slides)`);
@@ -459,6 +533,29 @@ async function main() {
     direction: gradientPairs[0]?.direction ?? 'to-br',
   };
 
+  // Real decks turn out to license a wide range of commercial foundry
+  // fonts (Neue Montreal, Telegraf, TT Hoves, AC Steelfish, Aileron,
+  // Heading Now...) that aren't freely available — so this deliberately
+  // does NOT surface literal font names for the app to reuse. What *is*
+  // safe and useful to learn is the structural pairing pattern: how often
+  // a deck uses one family at multiple weights vs. two distinct families,
+  // and whether its display type leans light/thin or bold/black. The raw
+  // samples are kept only as human-readable evidence for that finding.
+  const singleFamilyCount = fontPairingSamples.filter((s) => s.sameFamily).length;
+  const displayWeightCounts = fontPairingSamples.reduce((acc, s) => {
+    acc[s.displayWeight] = (acc[s.displayWeight] || 0) + 1;
+    return acc;
+  }, {});
+
+  const fontPairing = {
+    singleFamilyRatio: fontPairingSamples.length
+      ? Math.round((singleFamilyCount / fontPairingSamples.length) * 100) / 100
+      : 0.5,
+    displayWeightCounts,
+    sampleCount: fontPairingSamples.length,
+    samples: fontPairingSamples,
+  };
+
   const grammar = {
     version: '1.0.0',
     generatedAt: new Date().toISOString(),
@@ -488,6 +585,7 @@ async function main() {
     contrastPairs,
     gradientPairs,
     gradientRule,
+    fontPairing,
   };
 
   const outDir = path.dirname(OUTPUT_FILE);

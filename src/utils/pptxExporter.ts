@@ -2,6 +2,7 @@ import pptxgen from 'pptxgenjs';
 import { Slide, SlideElement, TextElement, ShapeElement, StatCardElement, TableElement, ImageElement, IconElement, CodeElement } from '../types/slide';
 import { getIconSvgDataUrl } from './iconHelper';
 import { blobPathToPptxPoints } from '../lib/engine/organicShapes';
+import { resolvePptxFont } from '../lib/design/fontManifest';
 
 // Convert CSS Hex color (#rrggbb or #rgb) to PPTX 6-char hex without #
 export const cleanHexColor = (hex: string): string => {
@@ -445,12 +446,10 @@ async function renderElementToPptx(
   }
 }
 
-function mapFontFace(fontFamily: string): string {
-  if (!fontFamily) return 'Calibri';
-  const clean = fontFamily.toLowerCase();
-  if (clean.includes('outfit')) return 'Segoe UI';
-  if (clean.includes('playfair')) return 'Georgia';
-  if (clean.includes('mono') || clean.includes('fira') || clean.includes('code')) return 'Consolas';
-  if (clean.includes('jakarta') || clean.includes('inter') || clean.includes('sans')) return 'Arial';
-  return fontFamily;
-}
+// mapFontFace() used to be a short, hand-maintained keyword list here that
+// fell back to returning the raw (unloadable) web font name for anything
+// it didn't recognize — meaning PowerPoint would silently pick its own
+// substitute for e.g. "Syne" or "Bricolage Grotesque". resolvePptxFont()
+// is the same lookup driven by the single font manifest, so every family
+// any theme actually uses has a deliberate, known-installed fallback.
+const mapFontFace = resolvePptxFont;

@@ -49,17 +49,33 @@ layout name or coordinates — just give it excellent content to work with:
 --------------------------------------------------------------------------------
 2. SINGLE UNIFIED THEME PER DECK
 --------------------------------------------------------------------------------
-Pick ONE master theme for the whole deck based on the topic:
+Pick ONE master theme for the whole deck based on the topic, and set the
+top-level "themeId" field to its id exactly as spelled below (this is what
+actually selects the theme — the "theme" color/font fields are a preview,
+not the source of truth, so themeId must match one you see here):
 - "cobalt-kinetic": Crisp Slate (#F4F6F9) + Midnight (#080E1E) hero + Electric
   Cobalt (#004BFE) + Acid Lemon (#E6FF00) — flagship modern tech & engineering.
+  Two-family pairing (Plus Jakarta Sans display / Inter body), bold display.
 - "warm-editorial": Warm Linen (#FBF8F3) + Obsidian (#0A0D17) hero + Terracotta
-  (#B85042) / Amber (#D97706) — architecture, monograph, design.
+  (#B85042) / Amber (#D97706) — architecture, monograph, design. Two-family
+  pairing (Playfair Display / Inter), bold display.
 - "swiss-studio": Clean Chalk (#F4F4F6) + Jet Black (#0A0D14) hero + Klein Blue
-  (#0044EE) — strategy, frameworks, systems.
+  (#0044EE) — strategy, frameworks, systems. Two-family pairing (Space
+  Grotesk / Inter), bold display.
 - "nordic-slate": Pale Slate (#F0F4F8) + Deep Navy (#0F172A) hero + Azure
-  (#0284C7) — enterprise, finance, healthcare.
+  (#0284C7) — enterprise, finance, healthcare. Two-family pairing (Plus
+  Jakarta Sans / Inter), bold display.
 - "midnight-iridescent": Charcoal (#111319) + Pure Black (#07090E) hero +
-  Amber/Emerald (#F59E0B / #10B981) — genomics, biotech, deep tech.
+  Amber/Emerald (#F59E0B / #10B981) — genomics, biotech, deep tech. Two-family
+  pairing (Syne / Inter), bold display.
+- "porcelain-light": Warm Porcelain (#FAF8F5) + Charcoal (#161A1D) hero + Sage
+  (#5C7C6C) + Clay (#E3A98F) — wellness, lifestyle, craft, culture, calm
+  editorial storytelling. Single family (Manrope, every weight — no second
+  typeface), light/airy display type.
+- "carbon-mono": Cool Gray (#F4F4F5) + True Black (#0A0A0B) hero + Coral-Red
+  (#FF4B3E) + Yellow (#FFD23F) — product launches, startups, consumer,
+  campaigns. Single family (Archivo, every weight — no second typeface),
+  bold/black display type.
 
 --------------------------------------------------------------------------------
 3. SLIDE CADENCE
@@ -80,6 +96,7 @@ Return a single valid JSON object without markdown code fences:
 {
   "presentationTitle": "string",
   "theme": {
+    "themeId": "cobalt-kinetic",
     "background": "#F4F6F9",
     "heroBg": "#080E1E",
     "cardBg": "#FFFFFF",
