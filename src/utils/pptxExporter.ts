@@ -25,8 +25,13 @@ const toY = (py: number): number => parseFloat(((py / CANVAS_H) * 5.625).toFixed
 const toW = (pw: number): number => parseFloat(((pw / CANVAS_W) * 10).toFixed(3));
 const toH = (ph: number): number => parseFloat(((ph / CANVAS_H) * 5.625).toFixed(3));
 
-// standard LAYOUT_16x9 is 10 x 5.625 inches = 405 points high.
-const toFontSizePt = (fontPx: number) => Math.max(8, Math.round(fontPx * (405 / CANVAS_H)));
+// standard LAYOUT_16x9 is 10 x 5.625 inches = 405 points high. The canvas
+// scales uniformly on both axes (1920px/10in === 1080px/5.625in === 192
+// px/in), so this same px->pt ratio is valid for font size, letter
+// spacing, and stroke widths alike.
+const PX_TO_PT = 405 / CANVAS_H;
+const toFontSizePt = (fontPx: number) => Math.max(8, Math.round(fontPx * PX_TO_PT));
+const toPt = (px: number) => parseFloat((px * PX_TO_PT).toFixed(2));
 
 /**
  * Generate and download a native .pptx PowerPoint presentation
@@ -119,9 +124,18 @@ async function renderElementToPptx(
         align: textEl.align || 'left',
         valign: textEl.verticalAlign || 'top',
         rotate: textEl.rotation || 0,
-        margin: textEl.padding ? (textEl.padding / 1080) * 405 : 0,
+        margin: textEl.padding ? toPt(textEl.padding) : 0,
         wrap: true,
       };
+
+      // Match the canvas renderer's CSS letter-spacing / line-height exactly
+      // so exported text reflows the same way it previewed.
+      if (textEl.letterSpacing) {
+        options.charSpacing = toPt(textEl.letterSpacing);
+      }
+      if (textEl.lineHeight) {
+        options.lineSpacingMultiple = textEl.lineHeight;
+      }
 
       if (textEl.backgroundColor) {
         options.fill = {
@@ -167,7 +181,7 @@ async function renderElementToPptx(
       if (shapeEl.borderWidth > 0 && shapeEl.borderColor) {
         shapeOptions.line = {
           color: cleanHexColor(shapeEl.borderColor),
-          width: Math.max(0.5, (shapeEl.borderWidth / 1080) * 405),
+          width: Math.max(0.5, toPt(shapeEl.borderWidth)),
           dashType: shapeEl.borderStyle === 'dashed' ? 'dash' : shapeEl.borderStyle === 'dotted' ? 'sysDot' : 'solid',
         };
       } else {

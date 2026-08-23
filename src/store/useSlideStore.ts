@@ -10,7 +10,7 @@ import {
 import { AssetItem, AssetManagerTab } from '../types/asset';
 import { AIPresentationResponse } from '../types/llm';
 import { assetStorage, DEFAULT_PRESET_ASSETS } from '../services/assetStorage';
-import { archetypeCompiler } from '../services/archetypeCompiler';
+import { slideComposer } from '../services/slideComposer';
 import { INITIAL_SLIDES, THEMES } from '../utils/defaultTemplates';
 
 interface HistorySnapshot {
@@ -918,7 +918,7 @@ export const useSlideStore = create<SlideState>((set, get) => ({
 
   loadAIGeneratedDeck: async (aiResponse: AIPresentationResponse, append: boolean = false) => {
     try {
-      const compiledSlides = await archetypeCompiler.compilePresentation(aiResponse, undefined, get().assets);
+      const compiledSlides = await slideComposer.compilePresentation(aiResponse, undefined, get().assets);
       const { slides, history, activeSlideId } = get();
 
       if (append) {

@@ -1,0 +1,115 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-08-23T18:20:37.065Z",
+  "sourceDeckCount": 10,
+  "sourceSlideCount": 120,
+  "margins": {
+    "xRatio": 0.05625,
+    "yRatio": 0.1037037037037037
+  },
+  "typeScale": {
+    "titleToCanvasHeightRatio": 0.0824074074074074,
+    "bodyToCanvasHeightRatio": 0.016666666666666666,
+    "titleToBodyRatio": 4.904761904761905
+  },
+  "spacing": {
+    "stackGapRatio": 0.05,
+    "columnGutterRatio": 0.06
+  },
+  "imageColumnRatio": 0.37005208333333334,
+  "contentDensity": {
+    "medianTextBlocksPerSlide": 7
+  },
+  "contrastPairs": [
+    {
+      "bg": "#000000",
+      "fg": "#FFFFFF",
+      "contrast": 21,
+      "count": 30
+    },
+    {
+      "bg": "#000000",
+      "fg": "#C3C5C6",
+      "contrast": 12.12,
+      "count": 12
+    },
+    {
+      "bg": "#EEEBE3",
+      "fg": "#CA0013",
+      "contrast": 5.01,
+      "count": 10
+    },
+    {
+      "bg": "#F5EEDD",
+      "fg": "#06202B",
+      "contrast": 14.53,
+      "count": 8
+    },
+    {
+      "bg": "#1351AA",
+      "fg": "#E3E2DE",
+      "contrast": 5.82,
+      "count": 6
+    },
+    {
+      "bg": "#FFFEF9",
+      "fg": "#2A4840",
+      "contrast": 9.91,
+      "count": 5
+    },
+    {
+      "bg": "#231F20",
+      "fg": "#F5F5F5",
+      "contrast": 14.95,
+      "count": 4
+    },
+    {
+      "bg": "#E3E2DE",
+      "fg": "#1351AA",
+      "contrast": 5.82,
+      "count": 4
+    },
+    {
+      "bg": "#231F20",
+      "fg": "#FFFFFF",
+      "contrast": 16.3,
+      "count": 3
+    },
+    {
+      "bg": "#F5EEDD",
+      "fg": "#0B0A0A",
+      "contrast": 17.1,
+      "count": 2
+    },
+    {
+      "bg": "#EBE2CD",
+      "fg": "#000000",
+      "contrast": 16.29,
+      "count": 2
+    },
+    {
+      "bg": "#149941",
+      "fg": "#F9F7F4",
+      "contrast": 3.47,
+      "count": 2
+    },
+    {
+      "bg": "#FFFEF9",
+      "fg": "#0E2821",
+      "contrast": 15.47,
+      "count": 1
+    },
+    {
+      "bg": "#F9F7F4",
+      "fg": "#737373",
+      "contrast": 4.43,
+      "count": 1
+    },
+    {
+      "bg": "#149941",
+      "fg": "#202121",
+      "contrast": 4.35,
+      "count": 1
+    }
+  ]
+}
