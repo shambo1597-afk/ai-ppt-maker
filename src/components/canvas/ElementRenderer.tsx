@@ -626,7 +626,10 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
         height: `${element.height}px`,
         transform: `rotate(${element.rotation || 0}deg)`,
         transformOrigin: 'center center',
-        zIndex: element.zIndex || 1,
+        // Nullish, not `||` — a deliberate zIndex of 0 (e.g. a background
+        // texture/ambient decoration meant to sit below zIndex-1 content)
+        // must stay 0, matching pptxExporter's export-order sort exactly.
+        zIndex: element.zIndex ?? 1,
         opacity: element.opacity ?? 1,
       }}
       onMouseDown={handleMouseDown}

@@ -2,10 +2,11 @@ import { BlobPoint } from '../../types/slide';
 
 /**
  * Deterministic seeded PRNG (mulberry32) — same seed always produces the
- * same blob, so a given slide's decoration is stable across re-renders
- * without needing to persist anything beyond the seed itself.
+ * same blob (or, via texture.ts, the same noise texture), so a given
+ * slide's decoration is stable across re-renders without needing to
+ * persist anything beyond the seed itself.
  */
-function seededRandom(seed: number): () => number {
+export function seededRandom(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;

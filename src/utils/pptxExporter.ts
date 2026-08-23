@@ -92,7 +92,7 @@ export async function exportPresentationToPPTX(
     }
 
     // 3. Sort elements by zIndex
-    const sortedElements = [...slideData.elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    const sortedElements = [...slideData.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
     // 4. Render each element as native PPTX object
     for (const el of sortedElements) {
