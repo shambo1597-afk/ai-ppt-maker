@@ -1,17 +1,20 @@
-import { Slide, SlideElement } from '../types/slide';
+import { Slide, SlideElement, ImageElement } from '../types/slide';
 import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../types/llm';
 import { AssetItem } from '../types/asset';
 import { getIconDataUrl } from '../lib/assets/iconFetcher';
 import { resolveThemeTokens, ThemeTokens } from '../lib/design/tokens';
 import { buildSlideContent } from '../lib/engine/contentModel';
 import { composeSlide, isHeroSurface } from '../lib/engine/composer';
+import { generateNoiseTextureDataUrl, hashStringSeed } from '../lib/engine/texture';
+import { CANVAS_W, CANVAS_H } from '../lib/engine/grid';
 
 /**
  * Compiles the AI's structured content response into SlideCraft's native
  * Slide[] scene graph. Layout is never chosen here — buildSlideContent()
  * extracts pure content and composeSlide() derives every coordinate from it
  * — this module's job is strictly content resolution: matching user-
- * uploaded assets to slides and fetching semantic vector icons.
+ * uploaded assets to slides, fetching semantic vector icons, and generating
+ * this deck's shared grain texture (see lib/engine/texture.ts).
  *
  * User-Asset-First: a slide only ever shows a photo/graphic the user
  * explicitly uploaded. There is no stock-photo search anywhere in this
@@ -27,6 +30,19 @@ export const slideComposer = {
     const theme = resolveThemeTokens(aiResponse.theme || fallbackTheme);
     const userImageAssets = availableAssets.filter((a) => a.type === 'image' && a.url);
     const total = aiResponse.slides.length;
+
+    // A single shared film-grain texture for the whole deck (not one per
+    // slide — that would multiply an already-heavy asset by slide count
+    // for no visible benefit, and keeps every slide's tactile "paper"
+    // quality visually consistent, matching how a real Canva template
+    // applies one grain asset across every slide it ships). Grounded in
+    // the real samples: several real decks' cover-slide background is a
+    // flat color or gradient with a visible grain overlay layered on top —
+    // this is a surface-rendering technique, not photographic content, so
+    // it's generated procedurally rather than sourced as a stock image
+    // (never fetched — see resolveUserAsset()'s no-stock-photo policy).
+    const textureSeed = hashStringSeed(aiResponse.presentationTitle || 'presentation');
+    const textureDataUrl = generateNoiseTextureDataUrl(textureSeed);
 
     const compiledSlides: Slide[] = [];
 
@@ -45,6 +61,9 @@ export const slideComposer = {
 
       const content = buildSlideContent(aiSlide, { index: slideIndex, total, imageUrl, iconSvgData });
       const elements: SlideElement[] = composeSlide(content, theme);
+      if (textureDataUrl) {
+        elements.unshift(buildTextureOverlay(textureDataUrl));
+      }
       const slideBg = isHeroSurface(content) ? theme.heroBg : theme.canvasBg;
 
       compiledSlides.push({
@@ -59,6 +78,26 @@ export const slideComposer = {
     return compiledSlides;
   },
 };
+
+/** Full-bleed, barely-there grain wash — sits below even the ambient blobs
+ * (zIndex 0), so it reads as texture on the flat background color rather
+ * than as a visible element of its own. */
+function buildTextureOverlay(dataUrl: string): ImageElement {
+  return {
+    id: `el-texture-${Date.now()}`,
+    type: 'image',
+    x: 0,
+    y: 0,
+    width: CANVAS_W,
+    height: CANVAS_H,
+    rotation: 0,
+    opacity: 0.07,
+    zIndex: -1,
+    src: dataUrl,
+    objectFit: 'cover',
+    borderRadius: 0,
+  };
+}
 
 /**
  * Strict user-asset resolution: an image is only ever attached to a slide
