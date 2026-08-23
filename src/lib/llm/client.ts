@@ -1,9 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
-import { AIPresentationResponse, LLMConfig, AISlideItem, AISlideArchetype } from '../../types/llm';
+import { AIPresentationResponse, LLMConfig, AISlideItem } from '../../types/llm';
 import { AssetItem } from '../../types/asset';
 import { getDesignSchoolSystemPrompt } from './designSchoolGuidelines';
 import { generateDynamicSlidesFromText } from '../parser/ruleBasedGenerator';
-import { useSlideStore } from '../../store/useSlideStore';
 import { resolveThemeTokens } from '../design/tokens';
 
 export const SYSTEM_PROMPT = getDesignSchoolSystemPrompt();
@@ -22,29 +21,30 @@ export interface GenerateOptions {
   config?: Partial<LLMConfig>;
 }
 
+function resolveGeminiApiKey(): string {
+  const envApiKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+  const localApiKey = (typeof window !== 'undefined' ? localStorage.getItem('slidecraft_gemini_key') : '') || '';
+  return envApiKey || localApiKey;
+}
+
 /**
- * Google GenAI Client implementation (@google/genai)
- * Injects the full Design School Curriculum, exact slide count, and user asset targeting
+ * Google GenAI Client implementation (@google/genai). Requests pure slide
+ * content (see designSchoolGuidelines.ts) — never a layout/archetype name —
+ * and falls back to the zero-API local parser when no key is configured or
+ * every candidate model fails. This is a pure data function: it returns the
+ * generated presentation and never writes to the app store itself, so the
+ * caller decides when (and whether) to commit it.
  */
 export async function generatePresentation(
   userContent: string,
   assets: AssetItem[] = [],
   slideCount: 'auto' | number = 'auto'
 ): Promise<AIPresentationResponse> {
-  const envApiKey = (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
-  const localApiKey = (typeof window !== 'undefined' ? localStorage.getItem('slidecraft_gemini_key') : '') || '';
-  const apiKey = envApiKey || localApiKey || 'AIzaSyBpg6NBSo1WsPdvmBOiY7vqWcE_Xen9iHM';
-
+  const apiKey = resolveGeminiApiKey();
   const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
 
   if (!apiKey) {
-    const fallback = generateDynamicSlidesFromText(userContent, assets, targetCount);
-    try {
-      await useSlideStore.getState().loadAIGeneratedDeck(fallback, false);
-    } catch {
-      // ignore
-    }
-    return fallback;
+    return generateDynamicSlidesFromText(userContent, assets, targetCount);
   }
 
   // Construct Asset Manifest & Slide Count Directives
@@ -64,7 +64,7 @@ ${JSON.stringify(assetManifest, null, 2)}
 INSTRUCTIONS FOR USER ASSETS:
 - When an asset has a specific targetSlide (e.g. 2), you MUST set "attachedAssetId": "${assets[0]?.id}" on that exact slide index (Slide 2).
 - When targetSlide is "auto", intelligently match the asset to the most relevant slide topic and assign "attachedAssetId".
-- Slides with an "attachedAssetId" will render the user's custom graphic instead of a stock photo.`;
+- Only slides with an "attachedAssetId" show any image — never invent one.`;
   }
 
   const countDirective =
@@ -72,7 +72,7 @@ INSTRUCTIONS FOR USER ASSETS:
       ? `Generate EXACTLY ${slideCount} slides (no more, no less).`
       : `Generate 5 to 6 slides following our musical slide cadence.`;
 
-  const promptText = `USER INPUT BRIEF & OUTLINE:\n${userContent.trim()}${assetDirective}\n\nTASK:\n${countDirective} Evaluate this brief strictly against our 5 Design School Laws (Müller-Brockmann 12-column grid, Bringhurst micro-typography, Gestalt dominance, Itten-Albers 60-30-10 color theory, and musical cadence). Generate structured JSON matching our Graphic Design Schema.`;
+  const promptText = `USER INPUT BRIEF & OUTLINE:\n${userContent.trim()}${assetDirective}\n\nTASK:\n${countDirective} Evaluate this brief strictly against our 5 Design School Laws (Müller-Brockmann 12-column grid, Bringhurst micro-typography, Gestalt dominance, Itten-Albers 60-30-10 color theory, and musical cadence). Generate structured JSON matching our Content Schema.`;
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -97,12 +97,7 @@ INSTRUCTIONS FOR USER ASSETS:
       const rawText = res.text || '';
       if (rawText) {
         const parsed = cleanAndParseJsonResponse(rawText, assets);
-        console.log('SLIDES GENERATED SUCCESSFULLY (Live Gemini 3.6 Flash):', parsed);
-        try {
-          await useSlideStore.getState().loadAIGeneratedDeck(parsed, false);
-        } catch (e) {
-          console.warn('Store update notice:', e);
-        }
+        console.log(`SLIDES GENERATED SUCCESSFULLY (${modelName}):`, parsed);
         return parsed;
       }
     } catch (err: any) {
@@ -112,43 +107,37 @@ INSTRUCTIONS FOR USER ASSETS:
 
   // Fallback to local rule-based dynamic design engine
   console.log('[Gemini API] Falling back to dynamic rule-based design engine');
-  const fallback = generateDynamicSlidesFromText(userContent, assets, targetCount);
-  try {
-    await useSlideStore.getState().loadAIGeneratedDeck(fallback, false);
-  } catch {
-    // ignore
-  }
-  return fallback;
+  return generateDynamicSlidesFromText(userContent, assets, targetCount);
 }
 
 /**
- * Compatibility wrapper
+ * Compatibility wrapper used by the UI: always resolves, surfacing a
+ * fallback notice instead of throwing when the cloud model is unavailable.
  */
 export async function generatePresentationWithGemini(
   assignmentText: string,
   assets: AssetItem[] = [],
   slideCount: 'auto' | number = 'auto'
 ): Promise<{ data: AIPresentationResponse; fallbackNotice?: string }> {
+  const hadApiKey = Boolean(resolveGeminiApiKey());
   try {
     const data = await generatePresentation(assignmentText, assets, slideCount);
-    return { data };
+    return { data, fallbackNotice: hadApiKey ? undefined : 'No Gemini API key configured — used the local design engine.' };
   } catch (err) {
     const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
     const fallback = generateDynamicSlidesFromText(assignmentText, assets, targetCount);
-    try {
-      await useSlideStore.getState().loadAIGeneratedDeck(fallback, false);
-    } catch {
-      // ignore
-    }
     return {
       data: fallback,
-      fallbackNotice: 'Using Dynamic Design Engine.',
+      fallbackNotice: 'Using the local design engine.',
     };
   }
 }
 
 /**
- * Clean, map and parse pure JSON response
+ * Clean, sanitize and parse the model's pure-content JSON response. This no
+ * longer normalizes an archetype/layoutType field — there isn't one; the
+ * scene-graph composer derives structure from whichever content facets
+ * (stat/quote/points/image) are actually present on each slide.
  */
 export function cleanAndParseJsonResponse(
   rawText: string,
@@ -188,24 +177,8 @@ export function cleanAndParseJsonResponse(
     tokens: themeTokens,
   };
 
-  // Normalize layoutType & archetype names to standardized values
-  parsed.slides = parsed.slides.map((s: any, idx: number) => {
-    let raw = (s.archetype || s.layoutType || (idx === 0 ? 'COVER' : 'TWO_TONE_SPLIT')).toUpperCase();
-    let archetype: AISlideArchetype = 'TWO_TONE_SPLIT';
-
-    if (raw === 'COVER' || raw === 'COVER_TITLE' || raw === 'HERO_MINIMAL' || idx === 0) {
-      archetype = 'COVER';
-    } else if (raw === 'TWO_TONE_SPLIT' || raw === 'PHOTO_SPLIT' || raw === 'EDITORIAL_SPLIT' || raw === 'SPLIT_EDITORIAL') {
-      archetype = 'TWO_TONE_SPLIT';
-    } else if (raw === 'BIG_STAT' || raw === 'BIG_STAT_HERO' || raw === 'STAT_IMPACT' || s.statValue) {
-      archetype = 'BIG_STAT';
-    } else if (raw === 'PROCESS_GRID' || raw === 'TIMELINE_LIST' || raw === 'THREE_PART_FLOW' || (s.points && s.points.length >= 3)) {
-      archetype = 'PROCESS_GRID';
-    } else if (raw === 'PULL_QUOTE' || raw === 'MINIMAL_QUOTE' || raw === 'QUOTE_EDITORIAL' || s.author) {
-      archetype = 'PULL_QUOTE';
-    }
-
-    // Check if an uploaded asset was targeted for this slide index (1-indexed)
+  parsed.slides = parsed.slides.map((s: any, idx: number): AISlideItem => {
+    // Check if an uploaded asset was explicitly targeted for this slide index (1-indexed)
     let attachedAssetId = s.attachedAssetId;
     let attachedAssetName = s.attachedAssetName;
 
@@ -216,14 +189,19 @@ export function cleanAndParseJsonResponse(
     }
 
     return {
-      ...s,
-      archetype,
+      headline: s.headline || '',
+      body: s.body || '',
+      subheading: s.subheading,
+      statValue: s.statValue,
+      statLabel: s.statLabel,
+      points: Array.isArray(s.points) ? s.points : undefined,
+      author: s.author,
+      notes: s.notes,
+      diagram: s.diagram,
+      iconName: s.icon || s.iconName || 'sparkles',
+      icon: s.icon,
       attachedAssetId,
       attachedAssetName,
-      imageKeywords: s.imageKeywords || '',
-      iconName: s.iconName || 'sparkles',
-      diagram: s.diagram,
-      icon: s.icon,
     };
   });
 

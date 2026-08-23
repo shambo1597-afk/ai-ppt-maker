@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "parse:canva": "node scripts/parseCanvaDeck.js"
+    "extract:grammar": "node scripts/extractDesignGrammar.js"
   },
   "dependencies": {
     "@google/genai": "^2.18.0",

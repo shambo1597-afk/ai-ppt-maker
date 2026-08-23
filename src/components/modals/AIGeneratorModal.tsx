@@ -2,16 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useSlideStore } from '../../store/useSlideStore';
 import { llmService } from '../../services/llmService';
 import { LLMProvider } from '../../types/llm';
-import { 
-  X, 
-  Sparkles, 
-  Key, 
-  Check, 
-  ShieldCheck, 
-  Zap, 
-  Bot, 
+import {
+  X,
+  Sparkles,
+  Key,
+  Check,
+  ShieldCheck,
+  Zap,
   ExternalLink,
-  Cpu
 } from 'lucide-react';
 
 export const AIGeneratorModal: React.FC = () => {
@@ -19,8 +17,6 @@ export const AIGeneratorModal: React.FC = () => {
 
   const [provider, setProvider] = useState<LLMProvider>('gemini');
   const [geminiKey, setGeminiKey] = useState('');
-  const [openaiKey, setOpenaiKey] = useState('');
-  const [anthropicKey, setAnthropicKey] = useState('');
   const [keysSaved, setKeysSaved] = useState(false);
 
   useEffect(() => {
@@ -28,8 +24,6 @@ export const AIGeneratorModal: React.FC = () => {
       const cfg = llmService.getConfig();
       setProvider(cfg.provider || 'gemini');
       setGeminiKey(cfg.geminiKey || '');
-      setOpenaiKey(cfg.openaiKey || '');
-      setAnthropicKey(cfg.anthropicKey || '');
       setKeysSaved(false);
     }
   }, [isAIGeneratorOpen]);
@@ -40,8 +34,6 @@ export const AIGeneratorModal: React.FC = () => {
     llmService.saveConfig({
       provider,
       geminiKey,
-      openaiKey,
-      anthropicKey,
     });
     setKeysSaved(true);
     setTimeout(() => {
@@ -86,11 +78,9 @@ export const AIGeneratorModal: React.FC = () => {
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
               Select AI Engine
             </label>
-            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-2xl bg-editor-subtle border border-editor-border">
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-editor-subtle border border-editor-border">
               {[
                 { id: 'gemini' as LLMProvider, name: 'Gemini', badge: 'Free/Fast' },
-                { id: 'openai' as LLMProvider, name: 'OpenAI', badge: 'GPT-4o' },
-                { id: 'anthropic' as LLMProvider, name: 'Claude', badge: 'Sonnet' },
                 { id: 'demo' as LLMProvider, name: 'Local', badge: 'Zero-API' },
               ].map((item) => (
                 <button
@@ -137,62 +127,6 @@ export const AIGeneratorModal: React.FC = () => {
               <p className="text-[11px] text-slate-400 leading-snug">
                 Uses <strong>gemini-1.5-flash</strong> for high-speed dynamic presentation synthesis.
               </p>
-            </div>
-          )}
-
-          {/* OpenAI API Key */}
-          {provider === 'openai' && (
-            <div className="space-y-2 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Bot size={14} className="text-emerald-400" />
-                  <span>OpenAI API Key</span>
-                </label>
-                <a
-                  href="https://platform.openai.com/api-keys"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1"
-                >
-                  <span>OpenAI Keys</span>
-                  <ExternalLink size={11} />
-                </a>
-              </div>
-              <input
-                type="password"
-                value={openaiKey}
-                onChange={(e) => setOpenaiKey(e.target.value)}
-                placeholder="sk-proj-..."
-                className="w-full px-4 py-3 rounded-2xl bg-editor-subtle border border-editor-border focus:border-indigo-500 text-xs text-white outline-none font-mono placeholder:text-slate-500"
-              />
-            </div>
-          )}
-
-          {/* Anthropic API Key */}
-          {provider === 'anthropic' && (
-            <div className="space-y-2 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Cpu size={14} className="text-purple-400" />
-                  <span>Anthropic API Key</span>
-                </label>
-                <a
-                  href="https://console.anthropic.com/settings/keys"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1"
-                >
-                  <span>Anthropic Keys</span>
-                  <ExternalLink size={11} />
-                </a>
-              </div>
-              <input
-                type="password"
-                value={anthropicKey}
-                onChange={(e) => setAnthropicKey(e.target.value)}
-                placeholder="sk-ant-..."
-                className="w-full px-4 py-3 rounded-2xl bg-editor-subtle border border-editor-border focus:border-indigo-500 text-xs text-white outline-none font-mono placeholder:text-slate-500"
-              />
             </div>
           )}
 

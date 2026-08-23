@@ -1,4 +1,4 @@
-import { AIPresentationResponse, AISlideItem, AIPresentationTheme, AISlideArchetype } from '../../types/llm';
+import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../../types/llm';
 import { AssetItem } from '../../types/asset';
 import { MASTER_THEMES } from '../design/tokens';
 
@@ -16,6 +16,9 @@ interface ParsedSection {
 /**
  * Intelligent client-side rule-based presentation generator
  * Parses raw assignment text, markdown outlines, headings, stats, and bullets into dynamic slides.
+ * Produces pure content (AISlideItem[]) — no layout/archetype decision is made here; the
+ * scene-graph composer (lib/engine/composer.ts) derives each slide's structure from this
+ * content when it's compiled.
  */
 export function generateDynamicSlidesFromText(
   rawText: string,
@@ -43,26 +46,26 @@ export function generateDynamicSlidesFromText(
   let themeTokens = MASTER_THEMES['cobalt-kinetic'];
 
   if (
-    lowerText.includes('security') || 
-    lowerText.includes('cyber') || 
-    lowerText.includes('latency') || 
-    lowerText.includes('infrastructure') || 
-    lowerText.includes('cloud') || 
-    lowerText.includes('distributed') || 
-    lowerText.includes('agent') || 
+    lowerText.includes('security') ||
+    lowerText.includes('cyber') ||
+    lowerText.includes('latency') ||
+    lowerText.includes('infrastructure') ||
+    lowerText.includes('cloud') ||
+    lowerText.includes('distributed') ||
+    lowerText.includes('agent') ||
     lowerText.includes('hardware')
   ) {
     themeTokens = MASTER_THEMES['midnight-iridescent'];
   } else if (
-    lowerText.includes('revenue') || 
-    lowerText.includes('investor') || 
-    lowerText.includes('arr') || 
-    lowerText.includes('growth') || 
-    lowerText.includes('market') || 
-    lowerText.includes('pitch') || 
+    lowerText.includes('revenue') ||
+    lowerText.includes('investor') ||
+    lowerText.includes('arr') ||
+    lowerText.includes('growth') ||
+    lowerText.includes('market') ||
+    lowerText.includes('pitch') ||
     lowerText.includes('series a') ||
-    lowerText.includes('clinical') || 
-    lowerText.includes('genomics') || 
+    lowerText.includes('clinical') ||
+    lowerText.includes('genomics') ||
     lowerText.includes('therapeutics')
   ) {
     themeTokens = MASTER_THEMES['nordic-slate'];
@@ -100,38 +103,27 @@ export function generateDynamicSlidesFromText(
   const rawSections = splitTextIntoSections(text);
   const parsedSections: ParsedSection[] = rawSections.map((sec, idx) => parseSectionContent(sec, idx + 1));
 
-  // 4. Build Structured Slides with dynamic archetype assignment
+  // 4. Build Structured Content Slides
   const slides: AISlideItem[] = [];
 
   // Slide 1: Cover
   const coverSubtitle = parsedSections[0]?.body || '';
   slides.push({
-    archetype: 'COVER',
     headline: presentationTitle,
     subheading: 'EXECUTIVE BRIEF',
     body: coverSubtitle.slice(0, 220),
-    imageKeywords: '',
     iconName: 'sparkles',
     notes: '',
   });
 
   // Subsequent Slides
   const remainingSections = parsedSections.length > 1 ? parsedSections.slice(1) : parsedSections;
-  
+
   remainingSections.forEach((sec, idx) => {
     const slideIdx = idx + 2;
-    let archetype: AISlideArchetype = 'TWO_TONE_SPLIT';
-
-    if (sec.statValue) {
-      archetype = 'BIG_STAT';
-    } else if (sec.quote || sec.author) {
-      archetype = 'PULL_QUOTE';
-    } else if (sec.points && sec.points.length >= 3) {
-      archetype = 'PROCESS_GRID';
-    }
+    const iconName = sec.statValue ? 'zap' : sec.points.length >= 3 ? 'layers' : 'sparkles';
 
     slides.push({
-      archetype,
       headline: sec.heading || `Key Topic 0${slideIdx}`,
       subheading: sec.subheading || `SECTION 0${slideIdx}`,
       body: sec.body || '',
@@ -139,8 +131,7 @@ export function generateDynamicSlidesFromText(
       statLabel: sec.statLabel,
       points: sec.points.length > 0 ? sec.points : undefined,
       author: sec.author,
-      imageKeywords: '',
-      iconName: archetype === 'BIG_STAT' ? 'zap' : archetype === 'PROCESS_GRID' ? 'layers' : 'sparkles',
+      iconName,
       notes: '',
     });
   });
@@ -255,21 +246,17 @@ function generateEmptyPresentation(): AIPresentationResponse {
     },
     slides: [
       {
-        archetype: 'COVER',
         headline: 'Presentation Title',
         subheading: 'EXECUTIVE BRIEF',
         body: '',
-        imageKeywords: '',
         iconName: 'sparkles',
       },
       {
-        archetype: 'TWO_TONE_SPLIT',
         headline: 'Overview',
         subheading: 'SECTION 02',
         body: '',
-        imageKeywords: '',
         iconName: 'layers',
-      }
+      },
     ],
   };
 }
