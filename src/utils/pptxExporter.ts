@@ -19,11 +19,11 @@ export const cleanHexColor = (hex: string): string => {
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
-// Use percentages for reliable cross-platform mapping
-const toX = (px: number) => `${((px / CANVAS_W) * 100).toFixed(2)}%`;
-const toY = (py: number) => `${((py / CANVAS_H) * 100).toFixed(2)}%`;
-const toW = (pw: number) => `${((pw / CANVAS_W) * 100).toFixed(2)}%`;
-const toH = (ph: number) => `${((ph / CANVAS_H) * 100).toFixed(2)}%`;
+// Convert 1920x1080 canvas pixels to 10 x 5.625 inch standard 16:9 PPTX coordinates
+const toX = (px: number): number => parseFloat(((px / CANVAS_W) * 10).toFixed(3));
+const toY = (py: number): number => parseFloat(((py / CANVAS_H) * 5.625).toFixed(3));
+const toW = (pw: number): number => parseFloat(((pw / CANVAS_W) * 10).toFixed(3));
+const toH = (ph: number): number => parseFloat(((ph / CANVAS_H) * 5.625).toFixed(3));
 
 // standard LAYOUT_16x9 is 10 x 5.625 inches = 405 points high.
 const toFontSizePt = (fontPx: number) => Math.max(8, Math.round(fontPx * (405 / CANVAS_H)));
