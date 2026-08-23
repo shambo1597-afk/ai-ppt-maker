@@ -92,6 +92,9 @@ interface Surface {
   accentBadge: string;
   fontHeading: string;
   fontBody: string;
+  /** 'bold' (900) or 'light' (300) for the slide's monumental display
+   * type — see ThemeTokens.displayWeight. */
+  displayFontWeight: '300' | '900';
 }
 
 function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
@@ -106,6 +109,7 @@ function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
     accentBadge: theme.accentBadge || theme.accent,
     fontHeading: theme.fontHeading,
     fontBody: theme.fontBody,
+    displayFontWeight: theme.displayWeight === 'light' ? '300' : '900',
   };
 }
 
@@ -273,10 +277,10 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
       text: content.headline,
       fontSize: titleSize,
       fontFamily: surface.fontHeading,
-      fontWeight: '900',
+      fontWeight: surface.displayFontWeight,
       color: surface.fg,
       lineHeight: 0.94,
-      letterSpacing: -2,
+      letterSpacing: surface.displayFontWeight === '300' ? 0 : -2,
       zIndex: z,
     })
   );
@@ -567,10 +571,10 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
       text: statValue,
       fontSize: statSize,
       fontFamily: surface.fontHeading,
-      fontWeight: '900',
+      fontWeight: surface.displayFontWeight,
       color: surface.accent,
       lineHeight: 0.95,
-      letterSpacing: -3,
+      letterSpacing: surface.displayFontWeight === '300' ? 0 : -3,
       zIndex: 2,
     })
   );
@@ -806,10 +810,10 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
       text: content.headline,
       fontSize: headlineSize,
       fontFamily: surface.fontHeading,
-      fontWeight: '900',
+      fontWeight: surface.displayFontWeight,
       color: surface.fg,
       lineHeight: 1.02,
-      letterSpacing: -1.5,
+      letterSpacing: surface.displayFontWeight === '300' ? 0 : -1.5,
       zIndex: 2,
     })
   );

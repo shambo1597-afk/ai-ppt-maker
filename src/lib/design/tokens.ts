@@ -13,10 +13,24 @@ export interface ThemeTokens {
   border: string;         // Subtle divider/border lines
   fontHeading: string;    // e.g. 'Playfair Display', 'Syne', 'Space Grotesk'
   fontBody: string;       // e.g. 'Inter', 'Plus Jakarta Sans', 'DM Sans'
+  /**
+   * Whether this theme's monumental display type (cover headline, stat
+   * number) should render bold/black or light/thin. Real Canva decks split
+   * roughly 90/10 bold-vs-light on their display face (see
+   * scripts/extractDesignGrammar.js's fontPairing.displayWeightCounts) —
+   * defaults to 'bold' so every existing theme's behavior is unchanged.
+   */
+  displayWeight?: 'light' | 'bold';
 }
 
 /**
- * 5 High-Energy Master Themes with Cobalt Kinetic as Flagship
+ * 7 High-Energy Master Themes with Cobalt Kinetic as Flagship.
+ *
+ * Real Canva decks split close to 40/60 between using a single type family
+ * at several weights and pairing two distinct families (see
+ * scripts/extractDesignGrammar.js's fontPairing.singleFamilyRatio) — the
+ * first 5 themes below are all two-family pairings; 'porcelain-light' and
+ * 'carbon-mono' are single-family systems grounded in that finding.
  */
 export const MASTER_THEMES: Record<string, ThemeTokens> = {
   'cobalt-kinetic': {
@@ -103,6 +117,50 @@ export const MASTER_THEMES: Record<string, ThemeTokens> = {
     fontHeading: "'Syne', 'Outfit', sans-serif",
     fontBody: "'Inter', sans-serif",
   },
+
+  'porcelain-light': {
+    id: 'porcelain-light',
+    name: 'Porcelain Light',
+    canvasBg: '#FAF8F5',          // Warm porcelain white
+    heroBg: '#161A1D',            // Near-black charcoal hero
+    sidebarBg: '#1F2427',         // Charcoal sidebar
+    cardBg: '#FFFFFF',            // Crisp card surface
+    textPrimary: '#1C1F22',       // Warm near-black
+    textMuted: '#6B7280',         // Neutral gray
+    textHero: '#F7F5F2',          // Warm off-white on dark
+    accent: '#5C7C6C',            // Sage green
+    accentBadge: '#E3A98F',       // Soft clay badge
+    border: '#E5E1DB',            // Warm hairline
+    // Single-family system: Manrope at every weight, never a second
+    // typeface — grounded in the ~40% of real decks that do this (e.g.
+    // "Neue Montreal"/"Telegraf"/"Inter" used across display and body).
+    fontHeading: "'Manrope', sans-serif",
+    fontBody: "'Manrope', sans-serif",
+    // Airy, editorial mega-display type — the real-deck pattern behind
+    // this is "Poppins Light" run at 127pt and "Telegraf Extra-Light".
+    displayWeight: 'light',
+  },
+
+  'carbon-mono': {
+    id: 'carbon-mono',
+    name: 'Carbon Mono',
+    canvasBg: '#F4F4F5',          // Cool light gray canvas
+    heroBg: '#0A0A0B',            // True black hero
+    sidebarBg: '#111113',         // Near-black sidebar
+    cardBg: '#FFFFFF',            // Crisp card surface
+    textPrimary: '#0A0A0B',       // True black
+    textMuted: '#6B6B70',         // Neutral gray
+    textHero: '#FFFFFF',          // Pure white
+    accent: '#FF4B3E',            // Vivid coral-red
+    accentBadge: '#FFD23F',       // High-energy yellow badge
+    border: '#E4E4E7',            // Cool hairline
+    // Single-family system: Archivo at every weight (see porcelain-light).
+    fontHeading: "'Archivo', sans-serif",
+    fontBody: "'Archivo', sans-serif",
+    // Punchy black display type — matches "Inter Bold" run at 371pt in
+    // the real samples.
+    displayWeight: 'bold',
+  },
 };
 
 export const DEFAULT_THEME: ThemeTokens = MASTER_THEMES['cobalt-kinetic'];
@@ -128,7 +186,16 @@ export function getThemeById(id?: string): ThemeTokens {
 export function resolveThemeTokens(input?: any): ThemeTokens {
   if (!input) return DEFAULT_THEME;
 
-  // Already a valid ThemeTokens
+  // An explicit, named theme choice always wins — exact fidelity (right
+  // fonts, right displayWeight, right everything) instead of reconstructing
+  // one from loose hex fields. This is what AIPresentationTheme.themeId
+  // (set by the LLM prompt and the local rule-based generator) is for.
+  const explicitId = input.themeId || input.id;
+  if (explicitId && MASTER_THEMES[explicitId]) {
+    return MASTER_THEMES[explicitId];
+  }
+
+  // Already a valid ThemeTokens shape (canvasBg/textPrimary/fontHeading/...)
   if (input.canvasBg && input.heroBg && input.textPrimary && input.accent) {
     return {
       id: input.id || 'cobalt-kinetic',
@@ -145,14 +212,33 @@ export function resolveThemeTokens(input?: any): ThemeTokens {
       border: input.border || '#E2E8F0',
       fontHeading: input.fontHeading || "'Plus Jakarta Sans', 'Inter', sans-serif",
       fontBody: input.fontBody || "'Inter', sans-serif",
+      displayWeight: input.displayWeight === 'light' ? 'light' : 'bold',
     };
   }
 
-  // Check if it has a matched ID
-  if (input.id && MASTER_THEMES[input.id]) {
-    return MASTER_THEMES[input.id];
+  // The flatter AIPresentationTheme shape the LLM/local generator actually
+  // emit (background/primary/fontHeader, not canvasBg/textPrimary/
+  // fontHeading) — reconstruct a full ThemeTokens from it when no themeId
+  // was recognized above.
+  if (input.background && input.accent) {
+    return {
+      id: 'custom',
+      name: 'Custom',
+      canvasBg: input.background,
+      heroBg: input.heroBg || input.background,
+      sidebarBg: input.sidebarBg || '#0B132B',
+      cardBg: input.cardBg || '#FFFFFF',
+      textPrimary: input.primary || '#0F172A',
+      textMuted: input.textMuted || '#64748B',
+      textHero: input.textHero || '#FFFFFF',
+      accent: input.accent,
+      accentBadge: input.accentBadge || '#E6FF00',
+      border: input.border || '#E2E8F0',
+      fontHeading: input.fontHeader || input.fontHeading || "'Plus Jakarta Sans', 'Inter', sans-serif",
+      fontBody: input.fontBody || "'Inter', sans-serif",
+      displayWeight: input.displayWeight === 'light' ? 'light' : 'bold',
+    };
   }
 
-  // Map legacy themes to Cobalt Kinetic by default
   return DEFAULT_THEME;
 }

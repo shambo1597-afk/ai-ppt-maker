@@ -83,6 +83,21 @@ export function generateDynamicSlidesFromText(
     lowerText.includes('editorial')
   ) {
     themeTokens = MASTER_THEMES['warm-editorial'];
+  } else if (
+    lowerText.includes('launch') ||
+    lowerText.includes('campaign') ||
+    lowerText.includes('startup') ||
+    lowerText.includes('consumer')
+  ) {
+    themeTokens = MASTER_THEMES['carbon-mono'];
+  } else if (
+    lowerText.includes('wellness') ||
+    lowerText.includes('lifestyle') ||
+    lowerText.includes('craft') ||
+    lowerText.includes('community') ||
+    lowerText.includes('culture')
+  ) {
+    themeTokens = MASTER_THEMES['porcelain-light'];
   }
 
   const theme: AIPresentationTheme = {
@@ -96,6 +111,7 @@ export function generateDynamicSlidesFromText(
     border: themeTokens.border,
     fontHeader: themeTokens.fontHeading,
     fontBody: themeTokens.fontBody,
+    themeId: themeTokens.id,
     tokens: themeTokens,
   };
 
@@ -243,6 +259,7 @@ function generateEmptyPresentation(): AIPresentationResponse {
       accent: themeTokens.accent,
       fontHeader: themeTokens.fontHeading,
       fontBody: themeTokens.fontBody,
+      themeId: themeTokens.id,
     },
     slides: [
       {

@@ -164,6 +164,12 @@ export function cleanAndParseJsonResponse(
 
   const themeTokens = resolveThemeTokens(parsed.theme);
   parsed.theme = {
+    // Carry the resolved theme's own id forward so any later
+    // resolveThemeTokens() call (slideComposer.ts resolves again) hits the
+    // same exact-match path instead of reconstructing a lossy approximation
+    // from hex fields — that reconstruction has no way to recover fields
+    // like displayWeight, which aren't part of the hex/font preview at all.
+    themeId: themeTokens.id,
     background: themeTokens.canvasBg,
     heroBg: themeTokens.heroBg,
     cardBg: themeTokens.cardBg,
