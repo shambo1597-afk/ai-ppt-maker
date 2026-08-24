@@ -71,6 +71,30 @@ function looksLikeQuote(headline: string): boolean {
   return trimmed.startsWith('"') || trimmed.startsWith('“') || trimmed.startsWith('‘');
 }
 
+/**
+ * composeStat() renders statValue as a monumental display number with
+ * statLabel directly beneath it — so a label that repeats the value (a
+ * source bullet like "312% Revenue Growth" naively split into both
+ * fields, or an LLM echoing the number back) renders as a visible
+ * duplicate of the number it's meant to caption. Defends both content
+ * sources — the rule-based parser and the LLM — from the same choke
+ * point, rather than trusting each producer to never do this.
+ */
+function sanitizeStatLabel(value: string, label: string | undefined): string | undefined {
+  if (!label) return undefined;
+  const trimmedLabel = label.trim();
+  if (!trimmedLabel) return undefined;
+  if (trimmedLabel.toLowerCase() === value.trim().toLowerCase()) return undefined;
+  if (trimmedLabel.toLowerCase().includes(value.trim().toLowerCase())) {
+    const stripped = trimmedLabel
+      .replace(new RegExp(value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '')
+      .replace(/^[\s,;:-]+|[\s,;:-]+$/g, '')
+      .trim();
+    return stripped || undefined;
+  }
+  return trimmedLabel;
+}
+
 export interface BuildSlideContentOptions {
   index: number; // 1-based
   total: number;
@@ -99,7 +123,7 @@ export function buildSlideContent(slide: AISlideItem, opts: BuildSlideContentOpt
     headline: slide.headline || '',
     body: slide.body || '',
     bullets,
-    stat: hasStat ? { value: slide.statValue as string, label: slide.statLabel } : undefined,
+    stat: hasStat ? { value: slide.statValue as string, label: sanitizeStatLabel(slide.statValue as string, slide.statLabel) } : undefined,
     quote: isQuoteFacet ? { text: slide.headline || '', author: slide.author || (slide.body || undefined) } : undefined,
     imageUrl,
     iconSvgData,

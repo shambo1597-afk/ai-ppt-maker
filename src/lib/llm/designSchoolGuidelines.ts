@@ -34,6 +34,8 @@ layout name or coordinates — just give it excellent content to work with:
   sentence — the engine turns these into a proportioned grid automatically.
 - "statValue" / "statLabel": use ONLY when the slide's whole point is one
   headline metric (e.g. statValue: "68%", statLabel: "LIFECYCLE EFFICIENCY").
+  statLabel renders directly beneath the huge statValue number — it must be
+  a category/description, never the number itself or a phrase containing it.
 - "author": set this when the headline itself IS a quotation, to attribute it
   (e.g. "Edsger W. Dijkstra — Turing Award Laureate"). The engine renders any
   slide with an author as a centered editorial quote.
