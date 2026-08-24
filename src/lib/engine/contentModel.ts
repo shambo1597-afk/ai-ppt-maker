@@ -12,6 +12,10 @@ import { AISlideItem } from '../../types/llm';
 export interface SlideBullet {
   title?: string;
   description: string;
+  /** A per-item vector icon, matched to this bullet's own text (see
+   * iconHelper.ts's inferIconForText) rather than reusing one icon across
+   * every card — see BuildSlideContentOptions.bulletIconSvgData. */
+  iconSvgData?: string;
 }
 
 export interface SlideStat {
@@ -45,25 +49,31 @@ function stripBulletPrefix(text: string): string {
   return text.replace(/^[•*\-0-9.]+\s*/, '').trim();
 }
 
+/** The non-empty points parseBullets will actually turn into bullets, in
+ * the same order — exported so slideComposer.ts can fetch one icon per
+ * *eventual* bullet (via Promise.all, before buildSlideContent even runs)
+ * and hand the results back aligned to the same indices, instead of
+ * duplicating this filter and risking the two lists drifting apart. */
+export function nonEmptyPoints(points: string[] | undefined): string[] {
+  return (points || []).filter((p) => p && p.trim().length > 0);
+}
+
 /**
  * Split "Title: description" list items into {title, description}; plain
  * items become description-only bullets. Purely mechanical text parsing —
  * no layout decisions are made here.
  */
 function parseBullets(points: string[] | undefined): SlideBullet[] {
-  if (!points || points.length === 0) return [];
-  return points
-    .filter((p) => p && p.trim().length > 0)
-    .map((point) => {
-      const colonIdx = point.indexOf(':');
-      if (colonIdx !== -1 && colonIdx < 60) {
-        return {
-          title: stripBulletPrefix(point.substring(0, colonIdx)),
-          description: point.substring(colonIdx + 1).trim(),
-        };
-      }
-      return { description: stripBulletPrefix(point) };
-    });
+  return nonEmptyPoints(points).map((point) => {
+    const colonIdx = point.indexOf(':');
+    if (colonIdx !== -1 && colonIdx < 60) {
+      return {
+        title: stripBulletPrefix(point.substring(0, colonIdx)),
+        description: point.substring(colonIdx + 1).trim(),
+      };
+    }
+    return { description: stripBulletPrefix(point) };
+  });
 }
 
 function looksLikeQuote(headline: string): boolean {
@@ -100,11 +110,18 @@ export interface BuildSlideContentOptions {
   total: number;
   imageUrl?: string;
   iconSvgData?: string;
+  /** One fetched icon per eventual bullet (see nonEmptyPoints), aligned by
+   * index — undefined entries mean no icon was matched/fetched for that
+   * bullet and composeGrid() should decide its own fallback. */
+  bulletIconSvgData?: (string | undefined)[];
 }
 
 export function buildSlideContent(slide: AISlideItem, opts: BuildSlideContentOptions): SlideContent {
-  const { index, total, imageUrl, iconSvgData } = opts;
+  const { index, total, imageUrl, iconSvgData, bulletIconSvgData } = opts;
   const bullets = parseBullets(slide.points);
+  bullets.forEach((bullet, i) => {
+    bullet.iconSvgData = bulletIconSvgData?.[i];
+  });
 
   const hasStat = Boolean(slide.statValue && slide.statValue.trim().length > 0);
   const hasAuthor = Boolean(slide.author && slide.author.trim().length > 0);

@@ -2,8 +2,9 @@ import { Slide, SlideElement, ImageElement } from '../types/slide';
 import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../types/llm';
 import { AssetItem } from '../types/asset';
 import { getIconDataUrl } from '../lib/assets/iconFetcher';
+import { inferIconForText } from '../utils/iconHelper';
 import { resolveThemeTokens, ThemeTokens } from '../lib/design/tokens';
-import { buildSlideContent } from '../lib/engine/contentModel';
+import { buildSlideContent, nonEmptyPoints } from '../lib/engine/contentModel';
 import { composeSlide, isHeroSurface } from '../lib/engine/composer';
 import { generateNoiseTextureDataUrl, hashStringSeed } from '../lib/engine/texture';
 import { CANVAS_W, CANVAS_H } from '../lib/engine/grid';
@@ -59,7 +60,34 @@ export const slideComposer = {
         iconSvgData = '';
       }
 
-      const content = buildSlideContent(aiSlide, { index: slideIndex, total, imageUrl, iconSvgData });
+      // Real Canva samples show grid-of-cards slides using a distinct icon
+      // per item (not one icon repeated across every card, and not
+      // necessarily the numbered badge composeGrid() falls back to) — so
+      // for a slide with enough points to actually become a grid, try to
+      // match each bullet's own text to a real icon (inferIconForText,
+      // reusing iconHelper.ts's curated tag table) and fetch it. Fired
+      // concurrently: sequential per-bullet fetches would multiply
+      // getIconDataUrl's worst-case network timeout by bullet count.
+      // Falls back to this slide's own icon per-bullet when a bullet's
+      // text doesn't match any tag, and composeGrid() falls back further
+      // (to the plain numbered badge) only if literally none matched.
+      const points = nonEmptyPoints(aiSlide.points);
+      let bulletIconSvgData: (string | undefined)[] = [];
+      if (points.length >= 2) {
+        bulletIconSvgData = await Promise.all(
+          points.map(async (point) => {
+            const inferred = inferIconForText(point);
+            if (!inferred) return iconSvgData || undefined;
+            try {
+              return await getIconDataUrl(inferred, theme.accent);
+            } catch {
+              return iconSvgData || undefined;
+            }
+          })
+        );
+      }
+
+      const content = buildSlideContent(aiSlide, { index: slideIndex, total, imageUrl, iconSvgData, bulletIconSvgData });
       const elements: SlideElement[] = composeSlide(content, theme);
       if (textureDataUrl) {
         elements.unshift(buildTextureOverlay(textureDataUrl));
