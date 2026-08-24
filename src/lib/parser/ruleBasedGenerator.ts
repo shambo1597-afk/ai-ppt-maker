@@ -123,7 +123,30 @@ export function generateDynamicSlidesFromText(
   const slides: AISlideItem[] = [];
 
   // Slide 1: Cover
-  const coverSubtitle = parsedSections[0]?.body || '';
+  let coverSubtitle = parsedSections[0]?.body || '';
+  let sectionsStartIdx = 1;
+
+  // A short "## Subtitle" line directly under the title heading splits
+  // into its own bare section, same as any other ## — splitTextIntoSections
+  // can't tell "the deck's subtitle" apart from "a real section" by
+  // syntax alone. But a real section always carries body prose, points,
+  // a stat, or a quote; a subtitle-only heading carries nothing but
+  // itself. When the section right after the title looks like that, fold
+  // its heading into the cover subtitle instead of letting it render as
+  // its own near-empty slide.
+  const possibleSubtitleSection = parsedSections[1];
+  const looksLikeSubtitle =
+    possibleSubtitleSection &&
+    possibleSubtitleSection.heading &&
+    !possibleSubtitleSection.body &&
+    possibleSubtitleSection.points.length === 0 &&
+    !possibleSubtitleSection.statValue &&
+    !possibleSubtitleSection.quote;
+  if (looksLikeSubtitle) {
+    coverSubtitle = possibleSubtitleSection.heading;
+    sectionsStartIdx = 2;
+  }
+
   slides.push({
     headline: presentationTitle,
     subheading: 'EXECUTIVE BRIEF',
@@ -133,7 +156,7 @@ export function generateDynamicSlidesFromText(
   });
 
   // Subsequent Slides
-  const remainingSections = parsedSections.length > 1 ? parsedSections.slice(1) : parsedSections;
+  const remainingSections = parsedSections.length > sectionsStartIdx ? parsedSections.slice(sectionsStartIdx) : parsedSections;
 
   remainingSections.forEach((sec, idx) => {
     const slideIdx = idx + 2;
@@ -211,13 +234,28 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
       const cleanPoint = line.replace(/^[•*-0-9.)]+\s*/, '').replace(/\*\*/g, '').trim();
       points.push(cleanPoint);
 
-      // Check for numeric metrics in the bullet
-      const metricMatch = cleanPoint.match(/(\b\d+(?:\.\d+)?\s*(?:ms|%|x|k|M|B|GB|TB|TB\/s|fps)\b|\$\d+(?:\.\d+)?(?:M|B|K)?)/i);
+      // Check for numeric metrics in the bullet. The trailing boundary is
+      // a negative lookahead rather than \b: \b only fires between a word
+      // and non-word character, so it never matches after a symbol unit
+      // like "%" when followed by a space or end of string (both sides
+      // non-word) — which is the overwhelmingly common shape ("312%
+      // growth", "312%" at a line's end), so the old \b-based regex
+      // missed most real percentage metrics entirely.
+      const metricMatch = cleanPoint.match(/(\b\d+(?:\.\d+)?\s*(?:ms|%|x|k|M|B|GB|TB|TB\/s|fps)(?![a-zA-Z0-9])|\$\d+(?:\.\d+)?(?:M|B|K)?(?![a-zA-Z0-9]))/i);
       if (metricMatch && !statValue) {
         statValue = metricMatch[1];
         const colonIdx = cleanPoint.indexOf(':');
         if (colonIdx !== -1) {
-          statLabel = cleanPoint.substring(0, colonIdx).toUpperCase();
+          // Strip the metric itself back out of the label half — a bullet
+          // like "312% Revenue Growth: driven by..." would otherwise
+          // produce statLabel "312% REVENUE GROWTH", repeating the exact
+          // value the big display number already shows right next to it.
+          const strippedLabel = cleanPoint
+            .substring(0, colonIdx)
+            .replace(statValue, '')
+            .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
+            .trim();
+          statLabel = (strippedLabel || 'KEY METRIC').toUpperCase();
         } else {
           statLabel = 'KEY METRIC';
         }

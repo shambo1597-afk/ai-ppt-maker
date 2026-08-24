@@ -2,7 +2,7 @@ import { SlideElement, TextElement, ShapeElement, ImageElement, IconElement } fr
 import { ThemeTokens } from '../design/tokens';
 import { mixHex } from '../design/colorMath';
 import { SlideContent, SlideBullet } from './contentModel';
-import { Box, CANVAS_H, getContentBox, stackGap, splitBox, computeGrid } from './grid';
+import { Box, CANVAS_H, getContentBox, stackGap, columnGutter, splitBox, computeGrid } from './grid';
 import { autoFitFontSize, baseTitleSize, baseBodySize, estimateTextHeight } from './typography';
 import { generatePosterGraphic, generateAmbientBlobs, PosterPalette } from './poster';
 
@@ -115,6 +115,18 @@ function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
 
 function toPosterPalette(surface: Surface): PosterPalette {
   return { accent: surface.accent, accentBadge: surface.accentBadge, textPrimary: surface.fg, fontHeading: surface.fontHeading };
+}
+
+/** Font-matching params for estimateTextHeight/autoFitFontSize — must
+ * mirror whatever the corresponding mkText() below actually sets, or the
+ * measurement is for the wrong glyphs (see typography.ts). Covers the
+ * two recurring shapes: a bold heading-font line, and a body-font
+ * paragraph at its default (non-bold) weight. */
+function headingFont(surface: Surface, fontWeight: string = '800') {
+  return { fontFamily: surface.fontHeading, fontWeight };
+}
+function bodyFont(surface: Surface) {
+  return { fontFamily: surface.fontBody };
 }
 
 /** A slide is composed on the hero (dark, high-energy) surface when it's the
@@ -260,12 +272,14 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
   // Vertically centered focal headline + optional body, sized to the content.
   const focalWidth = Math.round(box.width * 0.78);
   const focalHeightBudget = Math.round(box.height * 0.46);
+  const titleFont = { fontFamily: surface.fontHeading, fontWeight: surface.displayFontWeight, letterSpacing: surface.displayFontWeight === '300' ? 0 : -2 };
   const titleSize = autoFitFontSize(content.headline, focalWidth, focalHeightBudget, {
     maxSize: Math.round(baseTitleSize() * 1.75),
     minSize: Math.round(baseTitleSize() * 0.85),
     lineHeightRatio: 0.94,
+    ...titleFont,
   });
-  const titleHeight = estimateTextHeight(content.headline, titleSize, focalWidth, 0.94);
+  const titleHeight = estimateTextHeight(content.headline, titleSize, focalWidth, 0.94, titleFont);
   const focalY = box.y + Math.round((box.height - titleHeight) * 0.42);
 
   elements.push(
@@ -289,10 +303,20 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
   elements.push(composeAccentDivider(box.x, cursorY, surface, z + 1, Math.round(box.width * 0.09)));
   cursorY += Math.round(stackGap() * 0.9);
 
+  // Footer sits at a fixed offset from the box bottom regardless of how
+  // tall the title/body above it turned out to be, so — same as every
+  // other regime's body text — it's clamped to whatever room is actually
+  // left above the footer rather than its full natural height. Belt and
+  // suspenders alongside accurate title-height measurement above: that
+  // fix is what keeps titleHeight (and so cursorY) honest in the first
+  // place, this is what keeps an unusually long body from re-creating
+  // the same collision on its own.
+  const footerY = box.y + box.height - Math.round(baseBodySize() * 1.8);
   if (content.body) {
     const bodyWidth = Math.round(box.width * 0.62);
     const bodySize = Math.round(baseBodySize() * 1.35);
-    const bodyHeight = estimateTextHeight(content.body, bodySize, bodyWidth, 1.6);
+    const remainingHeight = footerY - Math.round(stackGap() * 0.5) - cursorY;
+    const bodyHeight = Math.min(Math.max(20, remainingHeight), estimateTextHeight(content.body, bodySize, bodyWidth, 1.6, { fontFamily: surface.fontBody }));
     elements.push(
       mkText({
         x: box.x,
@@ -310,7 +334,6 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
   }
 
   // Footer rule + author credit line.
-  const footerY = box.y + box.height - Math.round(baseBodySize() * 1.8);
   elements.push(
     mkShape({
       x: box.x,
@@ -371,6 +394,16 @@ function composeQuote(content: SlideContent, box: Box, surface: Surface): SlideE
     cursorY += Math.round(baseBodySize() * 2.4);
   }
 
+  // A real collision here (found by a broader sweep, not one of the
+  // originally-reported bugs, but the same class): mkText()'s default
+  // lineHeight is 1.4, so this glyph's *real* rendered box was
+  // glyphSize*1.4 tall while its declared `height` was only glyphSize —
+  // and the cursor was then advanced by an unrelated fixed fraction
+  // (glyphSize*0.72) instead of either figure, landing well short of
+  // where the glyph actually ends and letting the quote text start
+  // overlapping its tail. lineHeight:1 makes a single big glyph's
+  // declared height and real height the same number, so advancing by
+  // that height is now exactly correct instead of a guess.
   const glyphSize = Math.round(baseTitleSize() * 1.15);
   elements.push(
     mkText({
@@ -384,20 +417,23 @@ function composeQuote(content: SlideContent, box: Box, surface: Surface): SlideE
       fontWeight: '700',
       color: surface.accent,
       align: 'center',
+      lineHeight: 1,
       opacity: 0.45,
       zIndex: 1,
     })
   );
-  cursorY += Math.round(glyphSize * 0.72);
+  cursorY += glyphSize;
 
   const quoteText = content.quote!.text.replace(/^["“]|["”]$/g, '');
   const quoteHeightBudget = Math.round(box.height * 0.4);
+  const quoteFont = { fontFamily: surface.fontHeading, fontStyle: 'italic' as const, fontWeight: '600' };
   const quoteSize = autoFitFontSize(quoteText, quoteWidth, quoteHeightBudget, {
     maxSize: Math.round(baseTitleSize() * 0.62),
     minSize: Math.round(baseBodySize() * 1.6),
     lineHeightRatio: 1.28,
+    ...quoteFont,
   });
-  const quoteHeight = estimateTextHeight(quoteText, quoteSize, quoteWidth, 1.28);
+  const quoteHeight = estimateTextHeight(quoteText, quoteSize, quoteWidth, 1.28, quoteFont);
   elements.push(
     mkText({
       x: quoteX,
@@ -487,8 +523,9 @@ function composeMediaSplit(content: SlideContent, box: Box, surface: Surface): S
     maxSize: Math.round(baseTitleSize() * 0.62),
     minSize: Math.round(baseTitleSize() * 0.34),
     lineHeightRatio: 1.15,
+    ...headingFont(surface),
   });
-  const headlineHeight = estimateTextHeight(content.headline, headlineSize, headlineWidth, 1.15);
+  const headlineHeight = estimateTextHeight(content.headline, headlineSize, headlineWidth, 1.15, headingFont(surface));
   elements.push(
     mkText({
       x: textBox.x,
@@ -512,7 +549,7 @@ function composeMediaSplit(content: SlideContent, box: Box, surface: Surface): S
   if (content.body) {
     const bodySize = Math.round(baseBodySize() * 1.15);
     const remainingHeight = box.y + box.height - cursorY;
-    const bodyHeight = Math.min(remainingHeight, estimateTextHeight(content.body, bodySize, headlineWidth, 1.7));
+    const bodyHeight = Math.min(remainingHeight, estimateTextHeight(content.body, bodySize, headlineWidth, 1.7, bodyFont(surface)));
     elements.push(
       mkText({
         x: textBox.x,
@@ -555,13 +592,15 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
   );
 
   const statValue = content.stat!.value;
+  const statFont = { fontFamily: surface.fontHeading, fontWeight: surface.displayFontWeight, letterSpacing: surface.displayFontWeight === '300' ? 0 : -3 };
   const statSize = autoFitFontSize(statValue, leftBox.width, Math.round(leftBox.height * 0.42), {
     maxSize: Math.round(baseTitleSize() * 2.2),
     minSize: Math.round(baseTitleSize() * 1.1),
     lineHeightRatio: 0.95,
+    ...statFont,
   });
   const statY = leftBox.y + Math.round(baseBodySize() * 2.3);
-  const statHeight = estimateTextHeight(statValue, statSize, leftBox.width, 0.95);
+  const statHeight = estimateTextHeight(statValue, statSize, leftBox.width, 0.95, statFont);
   elements.push(
     mkText({
       x: leftBox.x,
@@ -599,7 +638,7 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
   }
   if (content.body) {
     const bodySize = Math.round(baseBodySize() * 0.9);
-    const bodyHeight = Math.min(leftBox.y + leftBox.height - leftCursorY, estimateTextHeight(content.body, bodySize, leftBox.width, 1.6));
+    const bodyHeight = Math.min(leftBox.y + leftBox.height - leftCursorY, estimateTextHeight(content.body, bodySize, leftBox.width, 1.6, bodyFont(surface)));
     elements.push(
       mkText({
         x: leftBox.x,
@@ -624,8 +663,9 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
     maxSize: Math.round(baseTitleSize() * 0.6),
     minSize: Math.round(baseTitleSize() * 0.32),
     lineHeightRatio: 1.15,
+    ...headingFont(surface),
   });
-  const headlineHeight = estimateTextHeight(content.headline, headlineSize, rightBox.width, 1.15);
+  const headlineHeight = estimateTextHeight(content.headline, headlineSize, rightBox.width, 1.15, headingFont(surface));
   elements.push(
     mkText({
       x: rightBox.x,
@@ -659,8 +699,9 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
     maxSize: Math.round(baseTitleSize() * 0.5),
     minSize: Math.round(baseTitleSize() * 0.3),
     lineHeightRatio: 1.15,
+    ...headingFont(surface),
   });
-  const headlineHeight = estimateTextHeight(content.headline, headlineSize, Math.round(box.width * 0.7), 1.15);
+  const headlineHeight = estimateTextHeight(content.headline, headlineSize, Math.round(box.width * 0.7), 1.15, headingFont(surface));
   elements.push(
     mkText({
       x: box.x,
@@ -679,8 +720,59 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
 
   const gridTop = header.contentY + headlineHeight + Math.round(stackGap() * 1.3);
   const gridBox: Box = { x: box.x, y: gridTop, width: box.width, height: box.y + box.height - gridTop };
-  const cells = computeGrid(content.bullets.length, gridBox, 4);
+
   const cardPad = Math.round(baseBodySize() * 1.2);
+  const pillSize = Math.round(baseBodySize() * 2.1);
+  const cardTitleSize = Math.round(baseBodySize() * 1.15);
+  const descMaxSize = Math.round(baseBodySize() * 0.95);
+  const descMinSize = Math.round(baseBodySize() * 0.6);
+
+  // Cards are sized to what their own content actually needs, not
+  // stretched to fill whatever vertical space the grid box happens to
+  // have (that was the "cards stretch across the full canvas height
+  // with big empty voids" bug — a 1-row grid always got the box's
+  // entire height regardless of how little text was in it). Every card
+  // in the grid still shares one uniform height for visual alignment —
+  // it's just sized off the *tallest* card's real content instead of
+  // off the box.
+  const cols = Math.max(1, Math.min(4, content.bullets.length));
+  const rows = Math.ceil(content.bullets.length / cols);
+  const gutter = columnGutter();
+  const colWidth = (gridBox.width - gutter * (cols - 1)) / cols;
+  const innerWidth = Math.round(colWidth) - cardPad * 2;
+  const rowGutter = stackGap() * 1.5;
+  const availableRowHeight = (gridBox.height - rowGutter * (rows - 1)) / rows;
+  const pillBlockHeight = Math.round(pillSize * 0.62);
+
+  const naturalCardHeights = content.bullets.map((bullet) => {
+    let h = cardPad + pillBlockHeight + Math.round(stackGap() * 0.5);
+    if (bullet.title) {
+      h += estimateTextHeight(bullet.title, cardTitleSize, innerWidth, 1.25, headingFont(surface)) + Math.round(stackGap() * 0.35);
+    }
+    if (bullet.description) {
+      h += estimateTextHeight(bullet.description, descMaxSize, innerWidth, 1.55, bodyFont(surface));
+    }
+    return h + cardPad;
+  });
+  const cardHeight = Math.min(Math.max(...naturalCardHeights), availableRowHeight);
+
+  // Center the (now content-sized, not box-stretched) row block in the
+  // remaining vertical space instead of pinning it to the top — otherwise
+  // fixing the stretch just relocates the old "big empty void" from
+  // inside the cards to a slab of dead space below them.
+  const rowsBlockHeight = rows * cardHeight + (rows - 1) * rowGutter;
+  const rowsTop = gridBox.y + Math.max(0, (gridBox.height - rowsBlockHeight) / 2);
+
+  const cells: Box[] = content.bullets.map((_, idx) => {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    return {
+      x: Math.round(gridBox.x + col * (colWidth + gutter)),
+      y: Math.round(rowsTop + row * (cardHeight + rowGutter)),
+      width: Math.round(colWidth),
+      height: Math.round(cardHeight),
+    };
+  });
 
   content.bullets.forEach((bullet: SlideBullet, idx: number) => {
     const cell = cells[idx];
@@ -699,13 +791,12 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
       })
     );
 
-    const pillSize = Math.round(baseBodySize() * 2.1);
     elements.push(
       mkShape({
         x: cell.x + cardPad,
         y: cell.y + cardPad,
         width: pillSize,
-        height: Math.round(pillSize * 0.62),
+        height: pillBlockHeight,
         shapeType: 'pill',
         fillColor: surface.accent,
         borderRadius: 999,
@@ -717,7 +808,7 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
         x: cell.x + cardPad,
         y: cell.y + cardPad,
         width: pillSize,
-        height: Math.round(pillSize * 0.62),
+        height: pillBlockHeight,
         text: String(idx + 1).padStart(2, '0'),
         fontSize: Math.round(baseBodySize() * 0.85),
         fontWeight: '800',
@@ -728,12 +819,10 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
       })
     );
 
-    let innerY = cell.y + cardPad + Math.round(pillSize * 0.62) + Math.round(stackGap() * 0.5);
-    const innerWidth = cell.width - cardPad * 2;
+    let innerY = cell.y + cardPad + pillBlockHeight + Math.round(stackGap() * 0.5);
 
     if (bullet.title) {
-      const titleSize = Math.round(baseBodySize() * 1.15);
-      const titleHeight = estimateTextHeight(bullet.title, titleSize, innerWidth, 1.25);
+      const titleHeight = estimateTextHeight(bullet.title, cardTitleSize, innerWidth, 1.25, headingFont(surface));
       elements.push(
         mkText({
           x: cell.x + cardPad,
@@ -741,7 +830,7 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
           width: innerWidth,
           height: titleHeight,
           text: bullet.title,
-          fontSize: titleSize,
+          fontSize: cardTitleSize,
           fontFamily: surface.fontHeading,
           fontWeight: '800',
           color: '#0F172A',
@@ -755,9 +844,10 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
     if (bullet.description) {
       const remainingHeight = cell.y + cell.height - innerY - cardPad;
       const descSize = autoFitFontSize(bullet.description, innerWidth, Math.max(20, remainingHeight), {
-        maxSize: Math.round(baseBodySize() * 0.95),
-        minSize: Math.round(baseBodySize() * 0.6),
+        maxSize: descMaxSize,
+        minSize: descMinSize,
         lineHeightRatio: 1.55,
+        ...bodyFont(surface),
       });
       elements.push(
         mkText({
@@ -794,13 +884,19 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
   const header = composeHeaderRow(textBox, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(textBox, content, surface, 1));
 
+  const typographicHeadlineFont = {
+    fontFamily: surface.fontHeading,
+    fontWeight: surface.displayFontWeight,
+    letterSpacing: surface.displayFontWeight === '300' ? 0 : -1.5,
+  };
   const headlineBudget = Math.round(box.height * 0.42);
   const headlineSize = autoFitFontSize(content.headline, textBox.width, headlineBudget, {
     maxSize: Math.round(baseTitleSize() * 1.3),
     minSize: Math.round(baseTitleSize() * 0.5),
     lineHeightRatio: 1.02,
+    ...typographicHeadlineFont,
   });
-  const headlineHeight = estimateTextHeight(content.headline, headlineSize, textBox.width, 1.02);
+  const headlineHeight = estimateTextHeight(content.headline, headlineSize, textBox.width, 1.02, typographicHeadlineFont);
   elements.push(
     mkText({
       x: textBox.x,
@@ -825,7 +921,7 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
   if (content.body) {
     const bodySize = Math.round(baseBodySize() * 1.2);
     const remainingHeight = box.y + box.height - cursorY;
-    const bodyHeight = Math.min(remainingHeight, estimateTextHeight(content.body, bodySize, textBox.width, 1.7));
+    const bodyHeight = Math.min(remainingHeight, estimateTextHeight(content.body, bodySize, textBox.width, 1.7, bodyFont(surface)));
     elements.push(
       mkText({
         x: textBox.x,
