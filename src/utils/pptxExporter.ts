@@ -45,6 +45,62 @@ const toTransparencyPercent = (...alphas: Array<number | undefined>): number => 
   return Math.max(0, Math.min(100, Math.round((1 - combined) * 100)));
 };
 
+// Every real Canva sample image uses <a:srcRect> to crop to its frame —
+// the exact OOXML mechanism behind CSS object-fit:cover. The canvas
+// renderer already gets this for free via CSS (`objectFit: el.objectFit`),
+// but pptxgenjs's own `sizing: {type:'cover'|'contain'}` can't reproduce
+// it: reading its source (dist/pptxgen.cjs.js) shows it computes the crop
+// using the *target box's own* w/h as a stand-in for the source image's
+// natural size (there's a literal `// FIXME: Measure actual image...`
+// comment marking this as unfinished) — so imgRatio and boxRatio are
+// always equal and the crop is always zero. To get a real, image-aware
+// crop we measure the actual source image ourselves and drive
+// pptxgenjs's lower-level `sizing:{type:'crop', x,y,w,h}` (which just
+// trims exact inches from an assumed-cx×cy source) with numbers chosen
+// so its formula reproduces our own cover/contain math.
+const probedImageSizeCache = new Map<string, { w: number; h: number } | null>();
+
+function getImageNaturalSize(src: string): Promise<{ w: number; h: number } | null> {
+  if (probedImageSizeCache.has(src)) {
+    return Promise.resolve(probedImageSizeCache.get(src)!);
+  }
+  // Only resolvable in a real browser (an <img> element) — Node/SSR/test
+  // contexts have no decoder, so we degrade to the old plain-stretch
+  // behavior there rather than failing the whole export.
+  if (typeof Image === 'undefined') {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    const finish = (result: { w: number; h: number } | null) => {
+      probedImageSizeCache.set(src, result);
+      resolve(result);
+    };
+    img.onload = () => finish(img.naturalWidth && img.naturalHeight ? { w: img.naturalWidth, h: img.naturalHeight } : null);
+    img.onerror = () => finish(null);
+    img.src = src;
+  });
+}
+
+/** Fraction (0..1) of the source image's own width/height to trim from
+ * each edge to reproduce CSS object-fit:cover for a box of the given
+ * aspect ratio — standard cover-crop math, symmetric on the axis that
+ * overflows. */
+function coverCropFractions(imgW: number, imgH: number, boxW: number, boxH: number) {
+  const imgRatio = imgW / imgH;
+  const boxRatio = boxW / boxH;
+  if (imgRatio > boxRatio) {
+    // Image is relatively wider than the box — crop left/right.
+    const visibleWidthFraction = boxRatio / imgRatio;
+    const d = (1 - visibleWidthFraction) / 2;
+    return { l: d, r: d, t: 0, b: 0 };
+  }
+  // Image is relatively taller than the box — crop top/bottom.
+  const visibleHeightFraction = imgRatio / boxRatio;
+  const d = (1 - visibleHeightFraction) / 2;
+  return { l: 0, r: 0, t: d, b: d };
+}
+
 /**
  * Generate and download a native .pptx PowerPoint presentation
  */
@@ -366,16 +422,74 @@ async function renderElementToPptx(
       const imgEl = el as ImageElement;
       if (!imgEl.src) break;
 
+      // Note: imgEl.borderRadius isn't applied here — pptxgenjs's picture
+      // clipping is a boolean `rounding` (circle/ellipse mask only), with
+      // no rounded-*rectangle* option, and every real Canva sample also
+      // uses plain rect picture frames (never masked/clipped) — so there's
+      // no faithful way to reproduce an arbitrary corner radius on a
+      // picture in PPTX, and no real-sample evidence pushing for one.
+
+      // Canvas-matching drop shadow (pptxgenjs's addImage supports this
+      // natively, previously just never wired up) — same preset used for
+      // shapes' soft floating-card look, converted px->pt like every
+      // other length in this file.
+      const shadow: pptxgen.ShadowProps | undefined = imgEl.shadow
+        ? { type: 'outer', color: '000000', opacity: 0.45, blur: toPt(40), offset: toPt(20), angle: 90 }
+        : undefined;
+
+      let imgX = x;
+      let imgY = y;
+      let imgW = w;
+      let imgH = h;
+      let sizing: pptxgen.ImageProps['sizing'];
+
+      const objectFit = imgEl.objectFit || 'cover';
+      if (objectFit !== 'fill') {
+        const natural = await getImageNaturalSize(imgEl.src);
+        if (natural) {
+          if (objectFit === 'cover') {
+            const { l, r, t, b } = coverCropFractions(natural.w, natural.h, w, h);
+            // pptxgenjs's own `sizing:{type:'crop'}` computes percentages
+            // as fractions of the *box* dims we pass here (see the
+            // comment above getImageNaturalSize) — so feeding it a crop
+            // sub-rect of our own box's own w/h reproduces exactly the
+            // l/r/t/b fractions we just computed, using its existing
+            // <a:srcRect> emission rather than hand-rolling the XML.
+            sizing = { type: 'crop', x: l * w, y: t * h, w: w * (1 - l - r), h: h * (1 - t - b) };
+          } else if (objectFit === 'contain') {
+            // No crop — shrink the picture itself to fit inside the box
+            // without distortion, centered, exactly like CSS object-fit:
+            // contain (letterboxed).
+            const imgRatio = natural.w / natural.h;
+            const boxRatio = w / h;
+            if (imgRatio > boxRatio) {
+              imgW = w;
+              imgH = w / imgRatio;
+            } else {
+              imgH = h;
+              imgW = h * imgRatio;
+            }
+            imgX = x + (w - imgW) / 2;
+            imgY = y + (h - imgH) / 2;
+          }
+        }
+        // No natural size available (Node/test context, load failure, or
+        // a remote path this environment can't probe) — fall back to the
+        // old plain stretch rather than failing the export.
+      }
+
       try {
         slide.addImage({
           data: imgEl.src.startsWith('data:') ? imgEl.src : undefined,
           path: !imgEl.src.startsWith('data:') ? imgEl.src : undefined,
-          x,
-          y,
-          w,
-          h,
+          x: imgX,
+          y: imgY,
+          w: imgW,
+          h: imgH,
+          sizing,
           rotate: imgEl.rotation || 0,
           transparency: toTransparencyPercent(imgEl.opacity),
+          shadow,
         });
       } catch (err) {
         console.warn('Failed to embed image in PPTX:', err);

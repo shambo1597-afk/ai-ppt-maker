@@ -1,6 +1,6 @@
-export type AssetType = 'image' | 'note' | 'pdf' | 'icon' | 'web-image';
+export type AssetType = 'image' | 'note' | 'pdf' | 'icon';
 
-export type AssetSource = 'upload' | 'unsplash' | 'wikimedia' | 'iconify' | 'preset';
+export type AssetSource = 'upload' | 'iconify' | 'preset';
 
 export interface AssetItem {
   id: string;
@@ -37,32 +37,4 @@ export interface IconifyIconItem {
   svg?: string;
 }
 
-export interface IconifySearchResponse {
-  icons: string[];
-  total: number;
-  limit: number;
-  start: number;
-  collections: Record<string, {
-    name: string;
-    total?: number;
-    author?: { name: string; url?: string };
-  }>;
-}
-
-export interface WebImageItem {
-  id: string;
-  source: 'unsplash' | 'wikimedia';
-  title: string;
-  description?: string;
-  url: string;
-  thumbUrl: string;
-  authorName: string;
-  authorUrl?: string;
-  aspectRatio?: number;
-  width?: number;
-  height?: number;
-  downloadLocation?: string;
-  license?: string;
-}
-
-export type AssetManagerTab = 'my-assets' | 'iconify' | 'web-images' | 'auto-match';
+export type AssetManagerTab = 'my-assets' | 'iconify' | 'auto-match';
