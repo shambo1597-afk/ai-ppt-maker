@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import * as Icons from 'lucide-react';
 
 export interface IconItem {
@@ -59,6 +60,39 @@ export const ICON_LIBRARY: IconItem[] = [
   { name: 'Rocket', category: 'Interface', tags: ['launch', 'startup', 'scale', 'fast'] },
 ];
 
+/** "Building2" -> "building-2" — the inverse of kebabToPascalCase below,
+ * for turning an ICON_LIBRARY component name into the kebab-case id
+ * iconFetcher.ts's Iconify lookup expects. */
+function pascalToKebab(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // camelCase boundary: "Shield" + "Check" -> "Shield-Check"
+    .replace(/([A-Za-z])(\d)/g, '$1-$2') // letter->digit boundary: "Building" + "2" -> "Building-2"
+    .toLowerCase();
+}
+
+/**
+ * Pick a real, content-appropriate icon for a piece of text (a grid
+ * card's title/description) by matching its words against ICON_LIBRARY's
+ * curated tags — the same "keyword -> icon" idea ruleBasedGenerator.ts
+ * already uses for whole-slide icon selection, extended to per-item
+ * granularity. Word-boundary matching (not substring) so a tag like
+ * "time" doesn't fire inside "sometimes" or "timeline". Deterministic:
+ * first match in ICON_LIBRARY order wins. Returns a kebab-case id ready
+ * for iconFetcher.ts's getIconDataUrl, or null when nothing matches —
+ * callers should fall back to the slide's own icon rather than guess.
+ */
+export function inferIconForText(text: string): string | null {
+  if (!text) return null;
+  const words = new Set(text.toLowerCase().match(/[a-z0-9]+/g) || []);
+  if (words.size === 0) return null;
+  for (const item of ICON_LIBRARY) {
+    if (item.tags.some((tag) => words.has(tag))) {
+      return pascalToKebab(item.name);
+    }
+  }
+  return null;
+}
+
 /**
  * Dynamically render a Lucide Icon by string name
  */
@@ -85,19 +119,46 @@ export function DynamicLucideIcon({
   });
 }
 
+/** "cpu-bold-duotone" -> "CpuBoldDuotone" — Iconify-style icon ids are
+ * kebab-case (see iconFetcher.ts's normalizeIconName), lucide-react's
+ * component export names are PascalCase; this bridges the two so a name
+ * like the ones this app actually generates ("sparkles", "shield-check",
+ * "building-2") resolves to its real lucide-react component. */
+function kebabToPascalCase(name: string): string {
+  return name
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+}
+
 /**
- * Generate an SVG data URI for a given Lucide icon to embed inside PPTXGenJS
+ * Generate an SVG data URI for a given icon to embed inside PPTXGenJS.
+ * This is only ever a last-resort fallback (pptxExporter.ts tries the
+ * element's own pre-fetched svgData and an id/name lookup in iconSvgMap
+ * first) — but a fallback that silently substitutes a fixed, unrelated
+ * checkmark icon regardless of what was actually requested is worse than
+ * no fallback: previously this function ignored `iconName` entirely and
+ * always returned the same hardcoded circle-check SVG. Now it renders
+ * the real matching lucide-react icon (the same library ElementRenderer's
+ * DynamicLucideIcon draws on canvas for this same non-Iconify-svgData
+ * case, via react-dom/server so it works outside a mounted React tree),
+ * falling back to a generic icon — same as DynamicLucideIcon's own
+ * fallback — only when the name truly doesn't match a known icon.
  */
 export function getIconSvgDataUrl(
   iconName: string,
   color: string = '#6366f1',
   strokeWidth: number = 2
 ): string {
-  // Fallback SVG string with Lucide geometry or standard shape
   const cleanColor = color.startsWith('#') ? color : `#${color}`;
-  
-  // We can construct a standard crisp SVG
-  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="${cleanColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+  const bareName = iconName.includes(':') ? iconName.split(':')[1] : iconName;
+  const pascalName = kebabToPascalCase(bareName);
+  // @ts-ignore - dynamic lookup by name, mirrors DynamicLucideIcon's own fallback
+  const Component = Icons[pascalName] || Icons.HelpCircle;
+  const svgString = renderToStaticMarkup(
+    React.createElement(Component, { size: 128, color: cleanColor, strokeWidth })
+  );
 
   // pptxgenjs's addImage() requires a base64-encoded data URL (a plain
   // URI-encoded one renders fine in an <img> but is silently rejected on

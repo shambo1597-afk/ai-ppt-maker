@@ -791,33 +791,56 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
       })
     );
 
-    elements.push(
-      mkShape({
-        x: cell.x + cardPad,
-        y: cell.y + cardPad,
-        width: pillSize,
-        height: pillBlockHeight,
-        shapeType: 'pill',
-        fillColor: surface.accent,
-        borderRadius: 999,
-        zIndex: 2,
-      })
-    );
-    elements.push(
-      mkText({
-        x: cell.x + cardPad,
-        y: cell.y + cardPad,
-        width: pillSize,
-        height: pillBlockHeight,
-        text: String(idx + 1).padStart(2, '0'),
-        fontSize: Math.round(baseBodySize() * 0.85),
-        fontWeight: '800',
-        color: '#FFFFFF',
-        align: 'center',
-        verticalAlign: 'middle',
-        zIndex: 3,
-      })
-    );
+    // Real Canva samples use both treatments across different slides —
+    // a plain numbered badge on some, a distinct vector icon per card on
+    // others — never a number *and* an icon together. slideComposer.ts
+    // tries to resolve a real icon per bullet (falling back to the
+    // slide's own icon, so this is populated unless nothing could be
+    // fetched at all), so a bullet with one gets the icon treatment;
+    // otherwise this card keeps the original numbered pill.
+    if (bullet.iconSvgData) {
+      elements.push(
+        mkIcon({
+          x: cell.x + cardPad,
+          y: cell.y + cardPad,
+          width: pillBlockHeight,
+          height: pillBlockHeight,
+          iconName: 'icon',
+          svgData: bullet.iconSvgData,
+          isIconify: true,
+          color: surface.accent,
+          zIndex: 2,
+        })
+      );
+    } else {
+      elements.push(
+        mkShape({
+          x: cell.x + cardPad,
+          y: cell.y + cardPad,
+          width: pillSize,
+          height: pillBlockHeight,
+          shapeType: 'pill',
+          fillColor: surface.accent,
+          borderRadius: 999,
+          zIndex: 2,
+        })
+      );
+      elements.push(
+        mkText({
+          x: cell.x + cardPad,
+          y: cell.y + cardPad,
+          width: pillSize,
+          height: pillBlockHeight,
+          text: String(idx + 1).padStart(2, '0'),
+          fontSize: Math.round(baseBodySize() * 0.85),
+          fontWeight: '800',
+          color: '#FFFFFF',
+          align: 'center',
+          verticalAlign: 'middle',
+          zIndex: 3,
+        })
+      );
+    }
 
     let innerY = cell.y + cardPad + pillBlockHeight + Math.round(stackGap() * 0.5);
 
