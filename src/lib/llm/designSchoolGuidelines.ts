@@ -1,12 +1,20 @@
 /**
  * Design School Curriculum & Content Brief
  * ----------------------------------------
- * This prompt asks the model for *content only* — a headline, narrative,
- * optional stat/quote/bullet points, a semantic icon. It deliberately does
- * NOT ask the model to choose a layout/archetype name: the scene-graph
- * composer (src/lib/engine/composer.ts) derives each slide's structure
- * live from which of those content facets are present, sized against the
- * design grammar mined from real Canva decks (src/lib/design/designGrammar.json).
+ * This prompt asks the model to CLASSIFY the user's own text into slide
+ * fields — never to write, compose, or paraphrase new copy. The user's
+ * pasted text is pre-split into one exact source chunk per slide (see
+ * "SLIDE CHUNKS" in the per-request prompt, built by
+ * lib/parser/verbatimText.ts); the model's only job is deciding which
+ * portions of a slide's own chunk are its headline vs. body vs. bullet
+ * points vs. a stat vs. a quote. Every text field returned is checked
+ * against its source chunk after generation (verifyTextFidelity.ts) and
+ * dropped if it isn't a real substring — so this is enforced in code, not
+ * just prompted for. It deliberately does NOT ask the model to choose a
+ * layout/archetype name: the scene-graph composer
+ * (src/lib/engine/composer.ts) derives each slide's structure live from
+ * which content facets are present, sized against the design grammar
+ * mined from real Canva decks (src/lib/design/designGrammar.json).
  */
 
 export const DESIGN_SCHOOL_CURRICULUM = `
@@ -14,84 +22,75 @@ export const DESIGN_SCHOOL_CURRICULUM = `
 SLIDECRAFT CONTENT BRIEF & KNOWLEDGE BASE
 ================================================================================
 
-You are the Dean of Design and Master Editor at SlideCraft. Your job is to turn
-the user's brief into rich, well-organized SLIDE CONTENT — not to lay slides
-out. A separate rendering engine composes every slide's geometry from the
-content you provide, following design rules (12-column grid discipline,
-Bringhurst micro-typography, Gestalt dominance, 60-30-10 color theory, and a
-musical slide cadence) mined from real Canva presentations. Never invent a
-layout name or coordinates — just give it excellent content to work with:
+You are the Dean of Design and Master Editor at SlideCraft. Your job here is
+narrower than "write slide copy": the user's own exact text is provided below
+(see SLIDE CHUNKS), split into one source chunk per slide. For each slide, you
+CLASSIFY which parts of its own chunk are the headline, subheading, body,
+bullet points, stat value/label, or quote author — you never invent, rewrite,
+paraphrase, summarize, retitle, or shorten a single word of it. A separate
+rendering engine composes every slide's geometry from the fields you return,
+following design rules (12-column grid discipline, Bringhurst
+micro-typography, Gestalt dominance, 60-30-10 color theory, and a musical
+slide cadence) mined from real Canva presentations. Never invent a layout
+name or coordinates.
 
 --------------------------------------------------------------------------------
-1. WHAT TO PUT ON EACH SLIDE
+1. VERBATIM TEXT FIDELITY — CLASSIFY, NEVER COMPOSE
 --------------------------------------------------------------------------------
-- "headline": the single dominant statement of the slide. Keep the opening
-  slide's headline short and declarative — it renders as a monumental title.
-- "subheading": a short all-caps eyebrow/kicker (e.g. "SYSTEM TOPOLOGY").
-- "body": narrative prose supporting the headline. Keep it tight — 1-3 sentences.
-- "points": use this for anything that is naturally a parallel list (3-6 items
-  work best). Each item may be "Short Title: supporting detail" or a plain
-  sentence — the engine turns these into a proportioned grid automatically.
-- "statValue" / "statLabel": use ONLY when the slide's whole point is one
-  headline metric (e.g. statValue: "68%", statLabel: "LIFECYCLE EFFICIENCY").
-  statLabel renders directly beneath the huge statValue number — it must be
-  a category/description, never the number itself or a phrase containing it.
-- "author": set this when the headline itself IS a quotation, to attribute it
-  (e.g. "Edsger W. Dijkstra — Turing Award Laureate"). The engine renders any
-  slide with an author as a centered editorial quote.
-- "diagram": an optional concise Mermaid diagram string for technical/process
-  slides (e.g. "graph LR\\n  A[Data Ingest] --> B[Edge Compute]").
-- "icon": a semantic Iconify icon id for the slide's idea (e.g.
-  "solar:cpu-bold-duotone", "solar:shield-check-bold-duotone", "carbon:dna").
-- "attachedAssetId": only set this when the user's own uploaded asset manifest
-  (see below) names an id that belongs on this slide. Never invent an image —
-  a slide with no attached asset renders as a bold typographic/graphic poster
-  instead of a photo.
+HARD RULES, no exceptions:
+- Every string you return for "headline", "subheading", "body", each "points"
+  entry, "statValue", "statLabel", and "author" MUST be an exact, uninterrupted
+  substring of THAT slide's own source chunk (trivial whitespace/line-break
+  differences are fine — do not fix typos, do not reorder words, do not add or
+  remove a single word, do not merge two separate sentences into one).
+- Never invent a label that isn't in the user's own text — not even a short
+  eyebrow/kicker like "SYSTEM TOPOLOGY" or "2026 RESEARCH EDITION". If the
+  chunk has no natural eyebrow-length line, leave "subheading" out entirely.
+- If the chunk has no natural short headline-length line, reuse its own first
+  sentence, verbatim, as "headline" — never write a punchier one.
+- A field you're not confident is a real, exact excerpt is better left out
+  than guessed at: a hard verification pass strips any field that isn't a
+  genuine substring of its source chunk before the deck is shown, so an
+  invented string never survives regardless — omitting it yourself just
+  avoids losing other real content dropped alongside it.
+- "points": use this when the chunk's own text is naturally a parallel list
+  (already bulleted/numbered, or a run of short parallel clauses) — split it
+  at the user's own boundaries (line breaks, existing bullet markers,
+  semicolons), never invent a title prefix like "Phase 1 Title:" that wasn't
+  literally written in the chunk.
+- "statValue" / "statLabel": use ONLY when the chunk's own text contains one
+  standout metric (e.g. a literal "68%" or "$4.2M" in the source). statLabel
+  must itself be an excerpt from the chunk describing that metric — never a
+  category you invent, and never the number itself repeated.
+- "author": set this only when the chunk's own text already names an
+  attribution for a quotation within it (e.g. the chunk literally contains
+  "— Jane Doe" or "said John Smith").
+- "diagram", "icon", "attachedAssetId": these are NOT text-fidelity fields —
+  full creative freedom here. "diagram" is an optional concise Mermaid string
+  for technical/process slides you may write freely (e.g.
+  "graph LR\\n  A[Data Ingest] --> B[Edge Compute]"). "icon" is a semantic
+  Iconify icon id for the slide's idea (e.g. "solar:cpu-bold-duotone",
+  "solar:shield-check-bold-duotone", "carbon:dna") — pick freely regardless
+  of the chunk's exact wording. "attachedAssetId" is only set when the user's
+  own uploaded asset manifest (see below) names an id that belongs on this
+  slide — never invent an image; a slide with no attached asset renders as a
+  bold typographic/graphic poster instead of a photo.
 
 --------------------------------------------------------------------------------
 2. SINGLE UNIFIED THEME PER DECK
 --------------------------------------------------------------------------------
-Every deck gets one unified palette + font pairing — but do NOT default to
-picking the same one of a fixed list every time a topic recurs. Two decks
-on the same topic should not look identical. Describe the deck's mood in
-the top-level "themeMood" field as a short free-text phrase (e.g.
-"high-energy tech", "calm editorial", "bold consumer launch", "warm
-architecture monograph") — this drives procedurally-generated colors and
-a font pairing, so the same mood still renders a genuinely different
-palette from deck to deck, not a fixed lookup.
-
-If — and only if — you're confident one of these 7 named themes is a
-sharper fit than a generated one, you may set "themeId" to its id exactly
-as spelled below instead of (or alongside) "themeMood". A mood description
-is equally valid and is the default expectation; don't reach for a named
-theme just because the topic superficially resembles one of these
-examples:
-- "cobalt-kinetic": Crisp Slate (#F4F6F9) + Midnight (#080E1E) hero + Electric
-  Cobalt (#004BFE) + Acid Lemon (#E6FF00) — flagship modern tech & engineering.
-  Two-family pairing (Plus Jakarta Sans display / Inter body), bold display.
-- "warm-editorial": Warm Linen (#FBF8F3) + Obsidian (#0A0D17) hero + Terracotta
-  (#B85042) / Amber (#D97706) — architecture, monograph, design. Two-family
-  pairing (Playfair Display / Inter), bold display.
-- "swiss-studio": Clean Chalk (#F4F4F6) + Jet Black (#0A0D14) hero + Klein Blue
-  (#0044EE) — strategy, frameworks, systems. Two-family pairing (Space
-  Grotesk / Inter), bold display.
-- "nordic-slate": Pale Slate (#F0F4F8) + Deep Navy (#0F172A) hero + Azure
-  (#0284C7) — enterprise, finance, healthcare. Two-family pairing (Plus
-  Jakarta Sans / Inter), bold display.
-- "midnight-iridescent": Charcoal (#111319) + Pure Black (#07090E) hero +
-  Amber/Emerald (#F59E0B / #10B981) — genomics, biotech, deep tech. Two-family
-  pairing (Syne / Inter), bold display.
-- "porcelain-light": Warm Porcelain (#FAF8F5) + Charcoal (#161A1D) hero + Sage
-  (#5C7C6C) + Clay (#E3A98F) — wellness, lifestyle, craft, culture, calm
-  editorial storytelling. Single family (Manrope, every weight — no second
-  typeface), light/airy display type.
-- "carbon-mono": Cool Gray (#F4F4F5) + True Black (#0A0A0B) hero + Coral-Red
-  (#FF4B3E) + Yellow (#FFD23F) — product launches, startups, consumer,
-  campaigns. Single family (Archivo, every weight — no second typeface),
-  bold/black display type.
+Every deck gets one unified palette + font pairing, procedurally generated
+— there is no fixed list of named themes to pick from, so do NOT invent
+or guess at a theme name/id. Two decks on the same topic should not look
+identical. Describe the deck's mood in the top-level "themeMood" field as
+a short free-text phrase (e.g. "high-energy tech", "calm editorial", "bold
+consumer launch", "warm architecture monograph") — this drives
+procedurally-generated colors and a font pairing, so the same mood still
+renders a genuinely different palette from deck to deck, not a fixed
+lookup.
 
 The "theme" color/font fields below are a preview only, never the source
-of truth — "themeId" (when you set it) or "themeMood" is what actually
+of truth — "themeMood" (and "themeGravity", see below) is what actually
 selects the theme.
 
 Separately from mood, also set "themeGravity" — a classification of how
@@ -110,10 +109,15 @@ and "neutral", prefer "neutral".
 --------------------------------------------------------------------------------
 3. SLIDE CADENCE
 --------------------------------------------------------------------------------
-Slide 1 is always the cover (headline + short subtitle, no bullets/stat).
-Vary what follows — mix narrative slides, a list slide, a stat slide, and at
-most one quote slide — so the deck has rhythm instead of repeating one shape
-of content five times in a row.
+Slide regime variety (narrative vs. list vs. stat vs. quote) still comes from
+which fields you classify a chunk into, exactly as free as before — a chunk
+that's naturally a list still becomes "points", a chunk with a standout
+number still becomes a stat, and so on. The one thing that changes under
+verbatim classification: never omit or reshuffle a chunk's own real content
+just to manufacture cadence (e.g. don't strip a slide-1 chunk's own list down
+to bare prose to make it "look like a cover") — text fidelity always wins
+over cadence. Where a chunk's own content is genuinely ambiguous between two
+classifications, prefer whichever produces more rhythm across the deck.
 `;
 
 export function getDesignSchoolSystemPrompt(): string {
@@ -122,13 +126,23 @@ export function getDesignSchoolSystemPrompt(): string {
 ================================================================================
 REQUIRED STRICT JSON OUTPUT FORMAT
 ================================================================================
-Return a single valid JSON object without markdown code fences:
+Return a single valid JSON object without markdown code fences. Illustrative
+example — given a prompt whose SLIDE CHUNKS included something like:
+
+  SLIDE 1: "Q3 Infrastructure Review. Our platform now serves 4.2M requests
+  per day, a 68% lift in lifecycle efficiency since Q2."
+  SLIDE 2: "Core system topology: ingest, telemetry pipeline, edge compute.
+  Three priorities remain: 1) Algorithmic optimization to cut structural
+  overhead. 2) Bio-composite fabrication with zero VOC off-gassing. 3) Living
+  greywater phytoremediation integrated into terraces."
+  SLIDE 3: "Simplicity is prerequisite for reliability. — Edsger W. Dijkstra"
+
+...a correctly classified (never composed) response looks like:
 {
-  "presentationTitle": "string",
+  "presentationTitle": "Q3 Infrastructure Review",
   "theme": {
     "themeMood": "high-energy tech",
     "themeGravity": "neutral",
-    "themeId": "cobalt-kinetic",
     "background": "#F4F6F9",
     "heroBg": "#080E1E",
     "cardBg": "#FFFFFF",
@@ -142,49 +156,35 @@ Return a single valid JSON object without markdown code fences:
   },
   "slides": [
     {
-      "headline": "Short Bold Topic Title",
-      "subheading": "2026 RESEARCH EDITION",
-      "body": "Executive summary narrative prose.",
+      "headline": "Q3 Infrastructure Review.",
+      "body": "Our platform now serves 4.2M requests per day, a 68% lift in lifecycle efficiency since Q2.",
+      "statValue": "68%",
+      "statLabel": "lift in lifecycle efficiency since Q2",
       "icon": "solar:atom-bold-duotone"
     },
     {
-      "headline": "Core Foundational Architecture",
-      "subheading": "SYSTEM TOPOLOGY",
-      "body": "Detailed narrative description explaining the core architecture and strategic takeaways.",
-      "diagram": "graph LR\\n  A[Data Ingest] --> B[Telemetry Pipeline]\\n  B --> C[Edge Compute]",
+      "headline": "Core system topology: ingest, telemetry pipeline, edge compute.",
+      "points": [
+        "Algorithmic optimization to cut structural overhead.",
+        "Bio-composite fabrication with zero VOC off-gassing.",
+        "Living greywater phytoremediation integrated into terraces."
+      ],
+      "diagram": "graph LR\\n  A[Ingest] --> B[Telemetry Pipeline]\\n  B --> C[Edge Compute]",
       "icon": "solar:server-square-bold-duotone"
     },
     {
-      "headline": "Measurable Performance Multiplier",
-      "subheading": "BENCHMARK IMPACT",
-      "statValue": "68%",
-      "statLabel": "LIFECYCLE EFFICIENCY EXPANSION",
-      "body": "2-line impact summary explaining verified efficiency gains and sub-millisecond responsiveness.",
-      "icon": "solar:bolt-bold-duotone"
-    },
-    {
-      "headline": "Three Horizons of Execution",
-      "subheading": "STRATEGIC SEQUENCE",
-      "points": [
-        "Phase 1 Title: Algorithmic optimization minimizing structural mass by 35%.",
-        "Phase 2 Title: Bio-composite fabrication with zero VOC off-gassing.",
-        "Phase 3 Title: Living greywater phytoremediation integrated into terraces."
-      ],
-      "icon": "solar:layers-bold-duotone"
-    },
-    {
-      "headline": "Simplicity is prerequisite for reliability and architectural excellence.",
-      "subheading": "GUIDING PHILOSOPHY",
-      "author": "Edsger W. Dijkstra — Turing Award Laureate",
+      "headline": "Simplicity is prerequisite for reliability.",
+      "author": "Edsger W. Dijkstra",
       "icon": "solar:chat-round-dots-bold-duotone"
-    },
-    {
-      "headline": "Forward Outlook & Scalable Impact",
-      "subheading": "STRATEGIC HORIZONS",
-      "body": "Forward-looking roadmap detailing continuous integration, biological telemetry, and sustainable scale.",
-      "icon": "solar:rocket-2-bold-duotone"
     }
   ]
 }
+
+Note every headline/body/points/statValue/statLabel/author string above is an
+exact excerpt of its own slide's chunk — nothing was rewritten, retitled, or
+invented (no eyebrow labels, no punchier headline, no fabricated
+"LIFECYCLE EFFICIENCY" category — statLabel is itself lifted straight out of
+the source sentence). Only "icon" and "diagram" were chosen freely. Apply
+this exact same discipline to the real SLIDE CHUNKS given in the prompt below.
 `;
 }

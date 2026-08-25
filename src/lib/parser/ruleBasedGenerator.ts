@@ -1,9 +1,10 @@
 import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../../types/llm';
 import { AssetItem } from '../../types/asset';
-import { MASTER_THEMES } from '../design/tokens';
 import { applyRhythmToAISlides } from '../engine/rhythm';
-import { newDeckSeed } from '../utils/prng';
-import { inferGravity } from '../design/themeGenerator';
+import { newDeckSeed, seededRandom } from '../utils/prng';
+import { generateTheme, hueHintForMood, inferGravity } from '../design/themeGenerator';
+import { buildSlideChunks } from './verbatimText';
+import { verifySlideTextFidelity } from './verifyTextFidelity';
 
 interface ParsedSection {
   heading: string;
@@ -45,74 +46,17 @@ export function generateDynamicSlidesFromText(
     presentationTitle = lines[0].replace(/^[#*-.\s]+/, '').slice(0, 70).trim();
   }
 
-  // 2. Autonomously Detect Domain Aesthetic & Theme from Master Themes
-  const lowerText = text.toLowerCase();
-  let themeTokens = MASTER_THEMES['cobalt-kinetic'];
-
-  if (
-    lowerText.includes('security') ||
-    lowerText.includes('cyber') ||
-    lowerText.includes('latency') ||
-    lowerText.includes('infrastructure') ||
-    lowerText.includes('cloud') ||
-    lowerText.includes('distributed') ||
-    lowerText.includes('agent') ||
-    lowerText.includes('hardware')
-  ) {
-    themeTokens = MASTER_THEMES['midnight-iridescent'];
-  } else if (
-    lowerText.includes('revenue') ||
-    lowerText.includes('investor') ||
-    lowerText.includes('arr') ||
-    lowerText.includes('growth') ||
-    lowerText.includes('market') ||
-    lowerText.includes('pitch') ||
-    lowerText.includes('series a') ||
-    lowerText.includes('clinical') ||
-    lowerText.includes('genomics') ||
-    lowerText.includes('therapeutics')
-  ) {
-    themeTokens = MASTER_THEMES['nordic-slate'];
-  } else if (
-    lowerText.includes('swiss') ||
-    lowerText.includes('studio') ||
-    lowerText.includes('minimal') ||
-    lowerText.includes('framework')
-  ) {
-    themeTokens = MASTER_THEMES['swiss-studio'];
-  } else if (
-    lowerText.includes('architecture') ||
-    lowerText.includes('monograph') ||
-    lowerText.includes('design') ||
-    lowerText.includes('editorial')
-  ) {
-    themeTokens = MASTER_THEMES['warm-editorial'];
-  } else if (
-    lowerText.includes('launch') ||
-    lowerText.includes('campaign') ||
-    lowerText.includes('startup') ||
-    lowerText.includes('consumer')
-  ) {
-    themeTokens = MASTER_THEMES['carbon-mono'];
-  } else if (
-    lowerText.includes('wellness') ||
-    lowerText.includes('lifestyle') ||
-    lowerText.includes('craft') ||
-    lowerText.includes('community') ||
-    lowerText.includes('culture')
-  ) {
-    themeTokens = MASTER_THEMES['porcelain-light'];
-  }
-
-  // Surfaced for any downstream consumer (or a future extension of this
-  // path) even though the 7 MASTER_THEMES picked above aren't gravity-
-  // aware themselves — this deliberately doesn't reach into themeTokens'
-  // own colors/decoration, since that would mean a keyword match like
-  // "midnight-iridescent" no longer renders as its own curated palette.
-  // Content-tone constrained generation (saturation/darkCanvas/fonts/
-  // blobs) is fully wired for the LLM path (see client.ts's
-  // cleanAndParseJsonResponse), the only path that calls generateTheme().
-  const themeGravity = inferGravity(text);
+  // 2. Generate a theme, seeded the same way the cloud path is (client.ts's
+  // cleanAndParseJsonResponse): a procedurally generated palette, hue-
+  // biased by the brief's own topic keywords (hueHintForMood(), the same
+  // keyword table the LLM path's themeMood hint resolves against) and
+  // constrained by the brief's inferred content-tone gravity, deterministic
+  // for this deck's own seed. There's no fixed theme registry to match
+  // against any more, so — unlike the old keyword ladder this replaces —
+  // every keyword bucket now only ever biases a hue, never picks a fixed
+  // palette outright.
+  const gravity = inferGravity(text);
+  const themeTokens = generateTheme({ hueHint: hueHintForMood(text), gravity, rand: seededRandom(deckSeed) });
 
   const theme: AIPresentationTheme = {
     background: themeTokens.canvasBg,
@@ -126,69 +70,57 @@ export function generateDynamicSlidesFromText(
     fontHeader: themeTokens.fontHeading,
     fontBody: themeTokens.fontBody,
     themeId: themeTokens.id,
-    themeGravity,
+    themeGravity: gravity,
     tokens: themeTokens,
   };
 
-  // 3. Segment Text into Logical Sections
-  const rawSections = splitTextIntoSections(text);
-  const parsedSections: ParsedSection[] = rawSections.map((sec, idx) => parseSectionContent(sec, idx + 1));
+  // 3. Build the slide-number -> source-chunk plan: explicit [[slide:N]]
+  // pins keep their exact number; everything else is auto-distributed
+  // paragraph/sentence chunks (see verbatimText.ts). This path was always
+  // purely extractive (it never wrote new copy), but it did fabricate
+  // placeholder labels ("Key Topic 0N", "SECTION 0N", "EXECUTIVE BRIEF")
+  // whenever a section had no natural heading — those get caught and
+  // stripped by verifySlideTextFidelity() below exactly like the LLM
+  // path's invented text would be, so "verbatim-always" applies uniformly
+  // to both generation paths.
+  const { chunks, slideCount, hasPinnedMarkers } = buildSlideChunks(text, targetSlideCount);
 
-  // 4. Build Structured Content Slides
+  // 4. Build one slide per claimed slide number, each parsed from (and
+  // hard-verified against) its own exact source chunk.
   const slides: AISlideItem[] = [];
+  for (let slideNum = 1; slideNum <= slideCount; slideNum++) {
+    const chunkText = chunks.get(slideNum);
+    if (!chunkText) {
+      // A genuine gap — a pinned number left earlier slots unclaimed with
+      // no unpinned text to fill them. An empty slide is more honest than
+      // fabricating placeholder copy for it.
+      slides.push({ headline: '', body: '', iconName: 'sparkles', notes: '' });
+      continue;
+    }
 
-  // Slide 1: Cover
-  let coverSubtitle = parsedSections[0]?.body || '';
-  let sectionsStartIdx = 1;
-
-  // A short "## Subtitle" line directly under the title heading splits
-  // into its own bare section, same as any other ## — splitTextIntoSections
-  // can't tell "the deck's subtitle" apart from "a real section" by
-  // syntax alone. But a real section always carries body prose, points,
-  // a stat, or a quote; a subtitle-only heading carries nothing but
-  // itself. When the section right after the title looks like that, fold
-  // its heading into the cover subtitle instead of letting it render as
-  // its own near-empty slide.
-  const possibleSubtitleSection = parsedSections[1];
-  const looksLikeSubtitle =
-    possibleSubtitleSection &&
-    possibleSubtitleSection.heading &&
-    !possibleSubtitleSection.body &&
-    possibleSubtitleSection.points.length === 0 &&
-    !possibleSubtitleSection.statValue &&
-    !possibleSubtitleSection.quote;
-  if (looksLikeSubtitle) {
-    coverSubtitle = possibleSubtitleSection.heading;
-    sectionsStartIdx = 2;
-  }
-
-  slides.push({
-    headline: presentationTitle,
-    subheading: 'EXECUTIVE BRIEF',
-    body: coverSubtitle.slice(0, 220),
-    iconName: 'sparkles',
-    notes: '',
-  });
-
-  // Subsequent Slides
-  const remainingSections = parsedSections.length > sectionsStartIdx ? parsedSections.slice(sectionsStartIdx) : parsedSections;
-
-  remainingSections.forEach((sec, idx) => {
-    const slideIdx = idx + 2;
+    const sec = parseSectionContent(chunkText, slideNum);
+    // Same "no natural headline-length line -> reuse the chunk's own
+    // first sentence" rule the LLM prompt asks the model to follow (see
+    // designSchoolGuidelines.ts), applied here too so a chunk with no
+    // markdown heading still gets a real, verbatim headline instead of a
+    // fabricated one.
+    const headline = sec.heading || firstSentence(chunkText);
     const iconName = sec.statValue ? 'zap' : sec.points.length >= 3 ? 'layers' : 'sparkles';
 
-    slides.push({
-      headline: sec.heading || `Key Topic 0${slideIdx}`,
-      subheading: sec.subheading || `SECTION 0${slideIdx}`,
-      body: sec.body || '',
+    const slide: AISlideItem = {
+      headline,
+      subheading: sec.subheading,
+      body: sec.body,
       statValue: sec.statValue,
       statLabel: sec.statLabel,
       points: sec.points.length > 0 ? sec.points : undefined,
       author: sec.author,
       iconName,
       notes: '',
-    });
-  });
+    };
+
+    slides.push(verifySlideTextFidelity(chunkText, slide));
+  }
 
   // Assign user assets if available
   if (uploadedAssets.length > 0) {
@@ -201,29 +133,32 @@ export function generateDynamicSlidesFromText(
     });
   }
 
-  // designSchoolGuidelines.ts's LLM-facing "vary slide types" guidance
-  // has no equivalent for this deterministic local path at all — a
-  // process-heavy brief parses into GRID slide after GRID slide every
-  // single time without this.
+  // designSchoolGuidelines.ts's LLM-facing "vary slide types" guidance has
+  // no equivalent for this deterministic local path at all — a process-
+  // heavy brief parses into GRID slide after GRID slide every single time
+  // without this. Skipped when the user pinned explicit slide numbers:
+  // rhythm enforcement can insert/reorder slides (e.g. splitting an
+  // overlong grid into two), which would shift a pinned chunk away from
+  // the exact position the user asked for.
   return {
     presentationTitle,
     theme,
-    slides: applyRhythmToAISlides(slides.slice(0, targetSlideCount)),
+    slides: hasPinnedMarkers ? slides : applyRhythmToAISlides(slides),
     deckSeed,
   };
 }
 
-/**
- * Split text by markdown headings or major block paragraphs
- */
-function splitTextIntoSections(text: string): string[] {
-  if (/^##\s+/m.test(text) || /^###\s+/m.test(text)) {
-    const rawChunks = text.split(/(?=^##?\s+|^###\s+)/m).filter((c) => c.trim().length > 0);
-    return rawChunks;
-  }
-
-  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
-  return paragraphs;
+/** The chunk's own first sentence (up to the first ./!/?, or its first
+ * line if there's no sentence-ending punctuation at all) — the same
+ * verbatim fallback headline rule the LLM prompt is asked to follow when
+ * a chunk has no natural short headline-length line. Never invents a
+ * punchier title; if there's nothing to extract, returns ''. */
+function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  const match = trimmed.match(/^[^.!?\n]*[.!?]/);
+  if (match) return match[0].trim();
+  return trimmed.split('\n')[0].trim();
 }
 
 /**
@@ -308,7 +243,7 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
 }
 
 function generateEmptyPresentation(deckSeed: number = newDeckSeed()): AIPresentationResponse {
-  const themeTokens = MASTER_THEMES['cobalt-kinetic'];
+  const themeTokens = generateTheme({ rand: seededRandom(deckSeed) });
   return {
     presentationTitle: 'Presentation',
     theme: {
@@ -318,6 +253,7 @@ function generateEmptyPresentation(deckSeed: number = newDeckSeed()): AIPresenta
       fontHeader: themeTokens.fontHeading,
       fontBody: themeTokens.fontBody,
       themeId: themeTokens.id,
+      tokens: themeTokens,
     },
     slides: [
       {

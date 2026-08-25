@@ -59,18 +59,17 @@ export interface FontPairing {
  * themeGenerator.ts to pick from — every family referenced here is
  * already loaded (see GOOGLE_FONT_SPECS above) with the weights it's
  * used at. 8 two-family pairings + 8 single-family systems, echoing the
- * ~40/60 single/two-family split real decks show (see the MASTER_THEMES
- * comment in tokens.ts) without hardcoding the two of seven master
- * themes' exact pairings as the only single-family option available.
+ * ~40/60 single/two-family split real decks show (see
+ * scripts/extractDesignGrammar.js's fontPairing.singleFamilyRatio).
  *
  * Single-family entries stick to families with a true upright 400 (or,
  * for Space Grotesk, 500 — its lightest loaded weight) so body copy
  * doesn't default to a heavy display weight — except Syne, deliberately
  * included at 600+ only: a "bold-mono" system in the same spirit as
- * carbon-mono's Archivo-at-every-weight, not an oversight. Playfair
- * Display never appears as a body font here for the same reason it
- * never does in MASTER_THEMES: this manifest only loads it at 600/700
- * upright (plus a 400 italic for quote styling), no true body weight.
+ * Archivo-at-every-weight, not an oversight. Playfair Display never
+ * appears as a body font here for the same reason: this manifest only
+ * loads it at 600/700 upright (plus a 400 italic for quote styling), no
+ * true body weight.
  */
 export const FONT_PAIRINGS: FontPairing[] = [
   // Two-family
