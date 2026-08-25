@@ -69,7 +69,8 @@ function twoToneBlobCluster(
   baseColor: string,
   facesRight: boolean,
   seedBase: number,
-  zIndexBase: number
+  zIndexBase: number,
+  deckSeed: number
 ): SlideElement[] {
   const { to: tint } = deriveGradient(baseColor, 1);
   const outward = facesRight ? box.x + box.width : box.x;
@@ -82,7 +83,7 @@ function twoToneBlobCluster(
       y: box.y - bigSize * 0.18,
       width: bigSize,
       height: bigSize,
-      seed: hashSeed(seedBase, 1),
+      seed: hashSeed(deckSeed, seedBase, 1),
       color: baseColor,
       opacity: 0.16,
       zIndex: zIndexBase,
@@ -93,7 +94,7 @@ function twoToneBlobCluster(
       y: box.y + box.height * 0.1,
       width: smallSize,
       height: smallSize,
-      seed: hashSeed(seedBase, 2),
+      seed: hashSeed(deckSeed, seedBase, 2),
       color: tint,
       opacity: 0.6,
       zIndex: zIndexBase + 1,
@@ -122,13 +123,14 @@ export function generatePosterGraphic(
   theme: PosterPalette,
   slideIndex: number,
   facesRight: boolean,
-  zIndexBase: number = 0
+  zIndexBase: number = 0,
+  deckSeed: number = 0
 ): SlideElement[] {
   const variant = slideIndex % 3;
   const outwardEdge = facesRight ? box.x + box.width : box.x;
 
   if (variant === 0) {
-    return twoToneBlobCluster(box, theme.accent, facesRight, slideIndex, zIndexBase);
+    return twoToneBlobCluster(box, theme.accent, facesRight, slideIndex, zIndexBase, deckSeed);
   }
 
   if (variant === 1) {
@@ -141,7 +143,7 @@ export function generatePosterGraphic(
         y: box.y + box.height - size * 0.85,
         width: size,
         height: size,
-        seed: hashSeed(slideIndex, 3),
+        seed: hashSeed(deckSeed, slideIndex, 3),
         color: theme.accentBadge || theme.accent,
         opacity: 0.14,
         zIndex: zIndexBase,
@@ -180,7 +182,7 @@ export function generatePosterGraphic(
       y,
       width: size,
       height: size,
-      seed: hashSeed(slideIndex, 10 + i),
+      seed: hashSeed(deckSeed, slideIndex, 10 + i),
       color: colors[i],
       opacity: opacities[i],
       zIndex: zIndexBase + i,
@@ -198,7 +200,12 @@ export function generatePosterGraphic(
  * slides. Always sits at the lowest z-index and never uses more than a
  * whisper of opacity so it never competes with text contrast.
  */
-export function generateAmbientBlobs(theme: PosterPalette, slideIndex: number, zIndexBase: number = 0): SlideElement[] {
+export function generateAmbientBlobs(
+  theme: PosterPalette,
+  slideIndex: number,
+  zIndexBase: number = 0,
+  deckSeed: number = 0
+): SlideElement[] {
   const corner = slideIndex % 2 === 0 ? 'br' : 'tl';
   const size = Math.round(CANVAS_H * 0.85);
   const { to: tint } = deriveGradient(theme.accent, 0.6);
@@ -212,7 +219,7 @@ export function generateAmbientBlobs(theme: PosterPalette, slideIndex: number, z
       y,
       width: size,
       height: size,
-      seed: hashSeed(slideIndex, 20),
+      seed: hashSeed(deckSeed, slideIndex, 20),
       color: theme.accent,
       opacity: 0.05,
       zIndex: zIndexBase,
@@ -223,7 +230,7 @@ export function generateAmbientBlobs(theme: PosterPalette, slideIndex: number, z
       y: y + size * 0.18,
       width: size * 0.55,
       height: size * 0.55,
-      seed: hashSeed(slideIndex, 21),
+      seed: hashSeed(deckSeed, slideIndex, 21),
       color: tint,
       opacity: 0.07,
       zIndex: zIndexBase + 1,

@@ -3,7 +3,10 @@ import { AIPresentationResponse, LLMConfig, AISlideItem } from '../../types/llm'
 import { AssetItem } from '../../types/asset';
 import { getDesignSchoolSystemPrompt } from './designSchoolGuidelines';
 import { generateDynamicSlidesFromText } from '../parser/ruleBasedGenerator';
-import { resolveThemeTokens } from '../design/tokens';
+import { MASTER_THEMES } from '../design/tokens';
+import { generateTheme, hueHintForMood } from '../design/themeGenerator';
+import { applyRhythmToAISlides } from '../engine/rhythm';
+import { seededRandom, newDeckSeed } from '../utils/prng';
 
 export const SYSTEM_PROMPT = getDesignSchoolSystemPrompt();
 
@@ -38,13 +41,14 @@ function resolveGeminiApiKey(): string {
 export async function generatePresentation(
   userContent: string,
   assets: AssetItem[] = [],
-  slideCount: 'auto' | number = 'auto'
+  slideCount: 'auto' | number = 'auto',
+  deckSeed: number = newDeckSeed()
 ): Promise<AIPresentationResponse> {
   const apiKey = resolveGeminiApiKey();
   const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
 
   if (!apiKey) {
-    return generateDynamicSlidesFromText(userContent, assets, targetCount);
+    return generateDynamicSlidesFromText(userContent, assets, targetCount, deckSeed);
   }
 
   // Construct Asset Manifest & Slide Count Directives
@@ -96,7 +100,11 @@ INSTRUCTIONS FOR USER ASSETS:
 
       const rawText = res.text || '';
       if (rawText) {
-        const parsed = cleanAndParseJsonResponse(rawText, assets);
+        const parsed = cleanAndParseJsonResponse(rawText, assets, deckSeed);
+        // designSchoolGuidelines.ts *asks* the model to vary slide types,
+        // but nothing enforces it — a process-heavy brief reliably
+        // produces a run of GRID slides regardless. Enforce it in code.
+        parsed.slides = applyRhythmToAISlides(parsed.slides);
         console.log(`SLIDES GENERATED SUCCESSFULLY (${modelName}):`, parsed);
         return parsed;
       }
@@ -107,7 +115,7 @@ INSTRUCTIONS FOR USER ASSETS:
 
   // Fallback to local rule-based dynamic design engine
   console.log('[Gemini API] Falling back to dynamic rule-based design engine');
-  return generateDynamicSlidesFromText(userContent, assets, targetCount);
+  return generateDynamicSlidesFromText(userContent, assets, targetCount, deckSeed);
 }
 
 /**
@@ -141,7 +149,8 @@ export async function generatePresentationWithGemini(
  */
 export function cleanAndParseJsonResponse(
   rawText: string,
-  uploadedAssets: AssetItem[] = []
+  uploadedAssets: AssetItem[] = [],
+  deckSeed: number = newDeckSeed()
 ): AIPresentationResponse {
   let cleaned = rawText.trim();
   if (cleaned.startsWith('```json')) {
@@ -162,7 +171,20 @@ export function cleanAndParseJsonResponse(
     throw new Error('Invalid presentation structure: "slides" array is missing or empty.');
   }
 
-  const themeTokens = resolveThemeTokens(parsed.theme);
+  // themeId is an exact, deliberate choice — honor it precisely. Anything
+  // else (no themeId, or one that doesn't name a real master theme) is
+  // NOT a cue to silently default to Cobalt Kinetic: it means the model
+  // described a mood instead (per the prompt's "a mood description is
+  // equally valid" guidance), so generate a genuinely new theme biased
+  // toward that mood's hue family — this is what actually decouples
+  // theme selection from topic, since two decks with the same mood still
+  // land on two different generated palettes.
+  const rawTheme = parsed.theme || {};
+  const explicitThemeId: string | undefined = rawTheme.themeId;
+  const themeTokens =
+    explicitThemeId && MASTER_THEMES[explicitThemeId]
+      ? MASTER_THEMES[explicitThemeId]
+      : generateTheme({ hueHint: hueHintForMood(rawTheme.themeMood), rand: seededRandom(deckSeed) });
   parsed.theme = {
     // Carry the resolved theme's own id forward so any later
     // resolveThemeTokens() call (slideComposer.ts resolves again) hits the
@@ -210,6 +232,8 @@ export function cleanAndParseJsonResponse(
       attachedAssetName,
     };
   });
+
+  parsed.deckSeed = deckSeed;
 
   return parsed as AIPresentationResponse;
 }

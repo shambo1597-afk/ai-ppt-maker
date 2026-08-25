@@ -1,4 +1,4 @@
-import { seededRandom } from './organicShapes';
+import { seededRandom } from '../utils/prng';
 
 /** Turn an arbitrary string (e.g. a presentation title) into a PRNG seed,
  * so the same deck always generates the same grain texture. */

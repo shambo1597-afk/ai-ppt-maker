@@ -1,3 +1,5 @@
+import { generateTheme } from './themeGenerator';
+
 export interface ThemeTokens {
   id: string;
   name: string;
@@ -166,7 +168,10 @@ export const MASTER_THEMES: Record<string, ThemeTokens> = {
 export const DEFAULT_THEME: ThemeTokens = MASTER_THEMES['cobalt-kinetic'];
 
 /**
- * Get a ThemeTokens by ID or default to Cobalt Kinetic
+ * Get a ThemeTokens by ID, generating a fresh procedural one when `id` is
+ * set but doesn't name a master theme (a stale/unknown id is a request
+ * for *some* real theme, not specifically Cobalt Kinetic) — only a
+ * genuinely absent `id` falls back to the flagship default.
  */
 export function getThemeById(id?: string): ThemeTokens {
   if (!id) return DEFAULT_THEME;
@@ -177,7 +182,9 @@ export function getThemeById(id?: string): ThemeTokens {
   const found = Object.values(MASTER_THEMES).find(
     (t) => t.id.includes(key) || t.name.toLowerCase().includes(key)
   );
-  return found || DEFAULT_THEME;
+  if (found) return found;
+
+  return generateTheme();
 }
 
 /**
@@ -198,8 +205,8 @@ export function resolveThemeTokens(input?: any): ThemeTokens {
   // Already a valid ThemeTokens shape (canvasBg/textPrimary/fontHeading/...)
   if (input.canvasBg && input.heroBg && input.textPrimary && input.accent) {
     return {
-      id: input.id || 'cobalt-kinetic',
-      name: input.name || 'Cobalt Kinetic',
+      id: input.id || 'custom',
+      name: input.name || 'Custom',
       canvasBg: input.canvasBg,
       heroBg: input.heroBg,
       sidebarBg: input.sidebarBg || '#0B132B',
@@ -238,6 +245,17 @@ export function resolveThemeTokens(input?: any): ThemeTokens {
       fontBody: input.fontBody || "'Inter', sans-serif",
       displayWeight: input.displayWeight === 'light' ? 'light' : 'bold',
     };
+  }
+
+  // An explicit id/themeId was given but didn't match a master theme
+  // (or a full/flat hex shape) — that's a request for *some* real,
+  // distinct theme, not silent Cobalt Kinetic every time. Generating one
+  // here is what makes resolveThemeTokens itself un-bottlenecked, for
+  // every caller (slideComposer.ts re-resolving an already-picked theme
+  // included), not just the one call site in client.ts that has a
+  // themeMood to bias it with (see cleanAndParseJsonResponse).
+  if (explicitId) {
+    return generateTheme();
   }
 
   return DEFAULT_THEME;

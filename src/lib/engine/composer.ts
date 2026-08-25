@@ -216,7 +216,7 @@ function composeIconBadge(box: Box, content: SlideContent, surface: Surface, z: 
 // Regime: TITLE — the deck's opening monumental poster slide.
 // ---------------------------------------------------------------------------
 function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   let z = 1;
 
   if (content.eyebrow) {
@@ -369,7 +369,7 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
 // Regime: QUOTE — a standalone, centered editorial breather.
 // ---------------------------------------------------------------------------
 function composeQuote(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const quoteWidth = Math.round(box.width * 0.74);
   const quoteX = box.x + Math.round((box.width - quoteWidth) / 2);
   let cursorY = box.y + Math.round(box.height * 0.12);
@@ -573,7 +573,7 @@ function composeMediaSplit(content: SlideContent, box: Box, surface: Surface): S
 // Regime: STAT — a single dominant metric paired with narrative context.
 // ---------------------------------------------------------------------------
 function composeStat(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const [leftBox, rightBox] = computeGrid(2, box, 2);
 
   elements.push(
@@ -690,7 +690,7 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
 // column count and card size are computed from the actual bullet count.
 // ---------------------------------------------------------------------------
 function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const header = composeHeaderRow(box, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(box, content, surface, 1));
 
@@ -902,7 +902,7 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
   const graphicFirst = content.index % 2 === 0;
   const { media: graphicBox, text: textBox } = splitBox(box, graphicFirst);
 
-  elements.push(...generatePosterGraphic(graphicBox, toPosterPalette(surface), content.index, !graphicFirst, 0));
+  elements.push(...generatePosterGraphic(graphicBox, toPosterPalette(surface), content.index, !graphicFirst, 0, content.deckSeed));
 
   const header = composeHeaderRow(textBox, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(textBox, content, surface, 1));
@@ -965,6 +965,24 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
 }
 
 /**
+ * The structural regime composeSlide() derives from which content facets
+ * are present — factored out to its own detectRegime() so anything that
+ * needs to know a slide's regime without composing it (rhythm.ts's
+ * enforceSlideRhythm) uses the exact same facet-detection rules instead
+ * of a second, driftable copy of them.
+ */
+export type Regime = 'title' | 'quote' | 'media-split' | 'stat' | 'grid' | 'typographic';
+
+export function detectRegime(content: SlideContent): Regime {
+  if (content.isTitleSlide) return 'title';
+  if (content.quote) return 'quote';
+  if (content.imageUrl) return 'media-split';
+  if (content.stat) return 'stat';
+  if (content.bullets.length >= 2) return 'grid';
+  return 'typographic';
+}
+
+/**
  * Compose the full element scene graph for one slide of content. This is
  * the only place layout decisions are made — the resulting SlideElement[]
  * is consumed identically by the live canvas renderer and the PPTX
@@ -974,10 +992,18 @@ export function composeSlide(content: SlideContent, theme: ThemeTokens): SlideEl
   const box = getContentBox();
   const surface = resolveSurface(theme, isHeroSurface(content));
 
-  if (content.isTitleSlide) return composeTitle(content, box, surface);
-  if (content.quote) return composeQuote(content, box, surface);
-  if (content.imageUrl) return composeMediaSplit(content, box, surface);
-  if (content.stat) return composeStat(content, box, surface);
-  if (content.bullets.length >= 2) return composeGrid(content, box, surface);
-  return composeTypographic(content, box, surface);
+  switch (detectRegime(content)) {
+    case 'title':
+      return composeTitle(content, box, surface);
+    case 'quote':
+      return composeQuote(content, box, surface);
+    case 'media-split':
+      return composeMediaSplit(content, box, surface);
+    case 'stat':
+      return composeStat(content, box, surface);
+    case 'grid':
+      return composeGrid(content, box, surface);
+    case 'typographic':
+      return composeTypographic(content, box, surface);
+  }
 }

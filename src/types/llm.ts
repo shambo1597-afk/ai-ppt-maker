@@ -35,6 +35,12 @@ export interface AIPresentationTheme {
   textHero?: string;
   border?: string;
   themeId?: string;
+  /** A free-text mood description (e.g. "high-energy tech") the model
+   * emits instead of (or alongside) themeId — decouples theme selection
+   * from a fixed 7-theme lookup so decks on the same topic don't
+   * converge on the same palette every time. See themeGenerator.ts's
+   * hueHintForMood(). */
+  themeMood?: string;
   tokens?: ThemeTokens;
 }
 
@@ -42,6 +48,11 @@ export interface AIPresentationResponse {
   presentationTitle: string;
   theme: AIPresentationTheme | ThemeTokens;
   slides: AISlideItem[];
+  /** The PRNG seed this deck's theme + blob geometry were derived from (see
+   * lib/utils/prng.ts). Two calls with the same input content get different
+   * random seeds and therefore visibly different themes/blobs; passing the
+   * same seed back in reproduces an identical deck. */
+  deckSeed?: number;
 }
 
 export type LLMProvider = 'gemini' | 'demo';
