@@ -5,9 +5,10 @@ import { getIconDataUrl } from '../lib/assets/iconFetcher';
 import { inferIconForText } from '../utils/iconHelper';
 import { resolveThemeTokens, ThemeTokens } from '../lib/design/tokens';
 import { buildSlideContent, nonEmptyPoints } from '../lib/engine/contentModel';
-import { composeSlide, isHeroSurface } from '../lib/engine/composer';
+import { composeSlide, isHeroSurface, detectRegime } from '../lib/engine/composer';
 import { generateNoiseTextureDataUrl, hashStringSeed } from '../lib/engine/texture';
 import { CANVAS_W, CANVAS_H } from '../lib/engine/grid';
+import { fetchTreatedPhoto, deriveSearchQuery } from '../lib/assets/stockPhotoFetcher';
 
 /**
  * Compiles the AI's structured content response into SlideCraft's native
@@ -17,10 +18,17 @@ import { CANVAS_W, CANVAS_H } from '../lib/engine/grid';
  * uploaded assets to slides, fetching semantic vector icons, and generating
  * this deck's shared grain texture (see lib/engine/texture.ts).
  *
- * User-Asset-First: a slide only ever shows a photo/graphic the user
- * explicitly uploaded. There is no stock-photo search anywhere in this
- * pipeline — when no asset is attached, composeSlide() falls back to a
- * generated typographic/graphic poster composition instead.
+ * User-Asset-First: a user-uploaded asset always wins, matched via
+ * resolveUserAsset() below. Only when a slide has no user asset AND would
+ * otherwise render as a bare typographic poster (no stat/quote/bullets/
+ * image — see detectRegime()) does this try a treated stock-photo
+ * fallback (fetchTreatedPhoto(), stockPhotoFetcher.ts): a Pexels photo
+ * with its background removed and recolored into this deck's own theme,
+ * never an unedited photo, and entirely inert with no VITE_PEXELS_API_KEY
+ * configured. Any other slide (a stat, a grid, a quote) still falls back
+ * to composeSlide()'s generated typographic/graphic poster exactly as
+ * before — this never overrides an existing regime, only fills in what
+ * used to be a poster-only gap.
  */
 export const slideComposer = {
   async compilePresentation(
@@ -41,7 +49,8 @@ export const slideComposer = {
     // flat color or gradient with a visible grain overlay layered on top —
     // this is a surface-rendering technique, not photographic content, so
     // it's generated procedurally rather than sourced as a stock image
-    // (never fetched — see resolveUserAsset()'s no-stock-photo policy).
+    // (never fetched raw — see this module's own User-Asset-First doc
+    // comment above and stockPhotoFetcher.ts's treated-only guarantee).
     const textureSeed = hashStringSeed(aiResponse.presentationTitle || 'presentation');
     const textureDataUrl = generateNoiseTextureDataUrl(textureSeed);
 
@@ -87,7 +96,7 @@ export const slideComposer = {
         );
       }
 
-      const content = buildSlideContent(aiSlide, {
+      let content = buildSlideContent(aiSlide, {
         index: slideIndex,
         total,
         imageUrl,
@@ -95,6 +104,31 @@ export const slideComposer = {
         bulletIconSvgData,
         deckSeed: aiResponse.deckSeed,
       });
+
+      // Treated stock-photo fallback: only for a slide that has no user
+      // asset AND would otherwise render as a bare typographic poster —
+      // i.e. a strong single headline/point with nothing else (a stat, a
+      // quote, a bullet list, an already-attached asset) competing for
+      // the slide. Never overrides a regime that already has content to
+      // show; only fills the gap composeSlide() would otherwise fill with
+      // an abstract poster flourish. fetchTreatedPhoto() itself no-ops
+      // (resolves null near-instantly) with no VITE_PEXELS_API_KEY
+      // configured, so this costs nothing on the common path.
+      if (!imageUrl && detectRegime(content) === 'typographic') {
+        const query = deriveSearchQuery(aiSlide.headline, aiSlide.body);
+        const treatedPhotoUrl = query ? await fetchTreatedPhoto(query, theme) : null;
+        if (treatedPhotoUrl) {
+          content = buildSlideContent(aiSlide, {
+            index: slideIndex,
+            total,
+            imageUrl: treatedPhotoUrl,
+            iconSvgData,
+            bulletIconSvgData,
+            deckSeed: aiResponse.deckSeed,
+          });
+        }
+      }
+
       const elements: SlideElement[] = composeSlide(content, theme);
       if (textureDataUrl) {
         elements.unshift(buildTextureOverlay(textureDataUrl));
