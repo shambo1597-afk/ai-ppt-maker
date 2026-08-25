@@ -43,6 +43,15 @@ export interface FontPairing {
   fontHeading: string;
   fontBody: string;
   singleFamily: boolean;
+  /** Content-tone fit (see themeGenerator.ts's Gravity type): 'restrained'
+   * for clean grotesk/serif pairings a somber brief can safely land on;
+   * 'playful' for heavy/condensed/quirky display faces that read as too
+   * high-energy for serious subject matter; 'neutral' for anything
+   * ambiguous. Only 'restrained' pairings are eligible when generateTheme()
+   * is called with gravity: 'somber'. Optional so a future pairing added
+   * without a tag degrades to "eligible everywhere except a somber pick"
+   * rather than a type error. */
+  mood?: 'restrained' | 'playful' | 'neutral';
 }
 
 /**
@@ -65,23 +74,23 @@ export interface FontPairing {
  */
 export const FONT_PAIRINGS: FontPairing[] = [
   // Two-family
-  { fontHeading: "'Playfair Display', serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Syne', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Outfit', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: false },
-  { fontHeading: "'Archivo', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
-  { fontHeading: "'Playfair Display', serif", fontBody: "'Manrope', sans-serif", singleFamily: false },
+  { fontHeading: "'Playfair Display', serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'restrained' },
+  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'neutral' },
+  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'neutral' },
+  { fontHeading: "'Syne', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'playful' },
+  { fontHeading: "'Outfit', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'neutral' },
+  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: false, mood: 'playful' },
+  { fontHeading: "'Archivo', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false, mood: 'playful' },
+  { fontHeading: "'Playfair Display', serif", fontBody: "'Manrope', sans-serif", singleFamily: false, mood: 'restrained' },
   // Single-family
-  { fontHeading: "'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: true },
-  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Plus Jakarta Sans', 'Inter', sans-serif", singleFamily: true },
-  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Space Grotesk', sans-serif", singleFamily: true },
-  { fontHeading: "'Outfit', sans-serif", fontBody: "'Outfit', sans-serif", singleFamily: true },
-  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Bricolage Grotesque', sans-serif", singleFamily: true },
-  { fontHeading: "'Manrope', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: true },
-  { fontHeading: "'Archivo', sans-serif", fontBody: "'Archivo', sans-serif", singleFamily: true },
-  { fontHeading: "'Syne', sans-serif", fontBody: "'Syne', sans-serif", singleFamily: true },
+  { fontHeading: "'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: true, mood: 'restrained' },
+  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Plus Jakarta Sans', 'Inter', sans-serif", singleFamily: true, mood: 'neutral' },
+  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Space Grotesk', sans-serif", singleFamily: true, mood: 'neutral' },
+  { fontHeading: "'Outfit', sans-serif", fontBody: "'Outfit', sans-serif", singleFamily: true, mood: 'neutral' },
+  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Bricolage Grotesque', sans-serif", singleFamily: true, mood: 'playful' },
+  { fontHeading: "'Manrope', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: true, mood: 'restrained' },
+  { fontHeading: "'Archivo', sans-serif", fontBody: "'Archivo', sans-serif", singleFamily: true, mood: 'playful' },
+  { fontHeading: "'Syne', sans-serif", fontBody: "'Syne', sans-serif", singleFamily: true, mood: 'playful' },
 ];
 
 function buildFamilyParam(spec: GoogleFontSpec): string {

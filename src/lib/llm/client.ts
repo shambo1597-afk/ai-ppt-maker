@@ -4,7 +4,7 @@ import { AssetItem } from '../../types/asset';
 import { getDesignSchoolSystemPrompt } from './designSchoolGuidelines';
 import { generateDynamicSlidesFromText } from '../parser/ruleBasedGenerator';
 import { MASTER_THEMES } from '../design/tokens';
-import { generateTheme, hueHintForMood } from '../design/themeGenerator';
+import { generateTheme, hueHintForMood, inferGravity, Gravity } from '../design/themeGenerator';
 import { applyRhythmToAISlides } from '../engine/rhythm';
 import { seededRandom, newDeckSeed } from '../utils/prng';
 
@@ -181,10 +181,27 @@ export function cleanAndParseJsonResponse(
   // land on two different generated palettes.
   const rawTheme = parsed.theme || {};
   const explicitThemeId: string | undefined = rawTheme.themeId;
+
+  // themeGravity is a deliberate, independent-of-hue classification — honor
+  // it exactly when the model gave a valid one. When it's missing (an
+  // older prompt cache, a model that dropped the field) fall back to the
+  // same keyword classifier ruleBasedGenerator.ts's zero-API path uses,
+  // run over the deck's own generated content (title + every slide's
+  // headline/body) rather than the raw brief text, since that's what's
+  // actually available here and is at least as reliable a signal.
+  const validGravities: Gravity[] = ['somber', 'neutral', 'energetic'];
+  const gravityInferenceText = [
+    parsed.presentationTitle,
+    ...(Array.isArray(parsed.slides) ? parsed.slides.map((s: any) => `${s.headline || ''} ${s.body || ''}`) : []),
+  ].join(' ');
+  const gravity: Gravity = validGravities.includes(rawTheme.themeGravity)
+    ? rawTheme.themeGravity
+    : inferGravity(gravityInferenceText);
+
   const themeTokens =
     explicitThemeId && MASTER_THEMES[explicitThemeId]
       ? MASTER_THEMES[explicitThemeId]
-      : generateTheme({ hueHint: hueHintForMood(rawTheme.themeMood), rand: seededRandom(deckSeed) });
+      : generateTheme({ hueHint: hueHintForMood(rawTheme.themeMood), gravity, rand: seededRandom(deckSeed) });
   parsed.theme = {
     // Carry the resolved theme's own id forward so any later
     // resolveThemeTokens() call (slideComposer.ts resolves again) hits the

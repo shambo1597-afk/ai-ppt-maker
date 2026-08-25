@@ -3,6 +3,7 @@ import { AssetItem } from '../../types/asset';
 import { MASTER_THEMES } from '../design/tokens';
 import { applyRhythmToAISlides } from '../engine/rhythm';
 import { newDeckSeed } from '../utils/prng';
+import { inferGravity } from '../design/themeGenerator';
 
 interface ParsedSection {
   heading: string;
@@ -103,6 +104,16 @@ export function generateDynamicSlidesFromText(
     themeTokens = MASTER_THEMES['porcelain-light'];
   }
 
+  // Surfaced for any downstream consumer (or a future extension of this
+  // path) even though the 7 MASTER_THEMES picked above aren't gravity-
+  // aware themselves — this deliberately doesn't reach into themeTokens'
+  // own colors/decoration, since that would mean a keyword match like
+  // "midnight-iridescent" no longer renders as its own curated palette.
+  // Content-tone constrained generation (saturation/darkCanvas/fonts/
+  // blobs) is fully wired for the LLM path (see client.ts's
+  // cleanAndParseJsonResponse), the only path that calls generateTheme().
+  const themeGravity = inferGravity(text);
+
   const theme: AIPresentationTheme = {
     background: themeTokens.canvasBg,
     heroBg: themeTokens.heroBg,
@@ -115,6 +126,7 @@ export function generateDynamicSlidesFromText(
     fontHeader: themeTokens.fontHeading,
     fontBody: themeTokens.fontBody,
     themeId: themeTokens.id,
+    themeGravity,
     tokens: themeTokens,
   };
 

@@ -1,4 +1,5 @@
 import { ThemeTokens } from '../lib/design/tokens';
+import type { Gravity } from '../lib/design/themeGenerator';
 
 /**
  * Pure content schema. There is intentionally no archetype/layoutType field
@@ -41,6 +42,13 @@ export interface AIPresentationTheme {
    * converge on the same palette every time. See themeGenerator.ts's
    * hueHintForMood(). */
   themeMood?: string;
+  /** The deck's content-tone classification, independent of themeMood's
+   * hue-flavored description — a somber public-health brief and an
+   * energetic product launch can share a mood-adjacent hue family while
+   * needing very different energy levels (saturation, decoration). See
+   * themeGenerator.ts's Gravity type and inferGravity() for the keyword
+   * fallback used when this is omitted. */
+  themeGravity?: Gravity;
   tokens?: ThemeTokens;
 }
 

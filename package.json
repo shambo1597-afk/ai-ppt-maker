@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "^2.18.0",
     "@iconify/react": "^6.0.2",
+    "@imgly/background-removal": "^1.7.0",
     "adm-zip": "^0.6.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
