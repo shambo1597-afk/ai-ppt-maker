@@ -43,6 +43,13 @@ export interface SlideContent {
   iconSvgData?: string;
   diagram?: string;
   notes?: string;
+  /** Per-deck seed (see prng.ts/client.ts's deckSeed) threaded down to
+   * organicShapes/poster.ts's blob generation, so blob shapes differ
+   * between two decks and not only between slides within one deck.
+   * Undefined degrades to poster.ts's own default (0) — every blob
+   * still deterministic, just not deck-distinct, matching behavior
+   * before deckSeed existed. */
+  deckSeed?: number;
 }
 
 function stripBulletPrefix(text: string): string {
@@ -114,10 +121,12 @@ export interface BuildSlideContentOptions {
    * index — undefined entries mean no icon was matched/fetched for that
    * bullet and composeGrid() should decide its own fallback. */
   bulletIconSvgData?: (string | undefined)[];
+  /** See SlideContent.deckSeed. */
+  deckSeed?: number;
 }
 
 export function buildSlideContent(slide: AISlideItem, opts: BuildSlideContentOptions): SlideContent {
-  const { index, total, imageUrl, iconSvgData, bulletIconSvgData } = opts;
+  const { index, total, imageUrl, iconSvgData, bulletIconSvgData, deckSeed } = opts;
   const bullets = parseBullets(slide.points);
   bullets.forEach((bullet, i) => {
     bullet.iconSvgData = bulletIconSvgData?.[i];
@@ -146,5 +155,6 @@ export function buildSlideContent(slide: AISlideItem, opts: BuildSlideContentOpt
     iconSvgData,
     diagram: slide.diagram,
     notes: slide.notes,
+    deckSeed,
   };
 }

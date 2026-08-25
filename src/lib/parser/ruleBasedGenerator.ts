@@ -2,6 +2,7 @@ import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../../
 import { AssetItem } from '../../types/asset';
 import { MASTER_THEMES } from '../design/tokens';
 import { applyRhythmToAISlides } from '../engine/rhythm';
+import { newDeckSeed } from '../utils/prng';
 
 interface ParsedSection {
   heading: string;
@@ -24,11 +25,12 @@ interface ParsedSection {
 export function generateDynamicSlidesFromText(
   rawText: string,
   uploadedAssets: AssetItem[] = [],
-  targetSlideCount: number = 6
+  targetSlideCount: number = 6,
+  deckSeed: number = newDeckSeed()
 ): AIPresentationResponse {
   const text = rawText.trim();
   if (!text) {
-    return generateEmptyPresentation();
+    return generateEmptyPresentation(deckSeed);
   }
 
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -195,6 +197,7 @@ export function generateDynamicSlidesFromText(
     presentationTitle,
     theme,
     slides: applyRhythmToAISlides(slides.slice(0, targetSlideCount)),
+    deckSeed,
   };
 }
 
@@ -292,7 +295,7 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
   };
 }
 
-function generateEmptyPresentation(): AIPresentationResponse {
+function generateEmptyPresentation(deckSeed: number = newDeckSeed()): AIPresentationResponse {
   const themeTokens = MASTER_THEMES['cobalt-kinetic'];
   return {
     presentationTitle: 'Presentation',
@@ -318,5 +321,6 @@ function generateEmptyPresentation(): AIPresentationResponse {
         iconName: 'layers',
       },
     ],
+    deckSeed,
   };
 }

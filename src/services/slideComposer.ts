@@ -87,7 +87,14 @@ export const slideComposer = {
         );
       }
 
-      const content = buildSlideContent(aiSlide, { index: slideIndex, total, imageUrl, iconSvgData, bulletIconSvgData });
+      const content = buildSlideContent(aiSlide, {
+        index: slideIndex,
+        total,
+        imageUrl,
+        iconSvgData,
+        bulletIconSvgData,
+        deckSeed: aiResponse.deckSeed,
+      });
       const elements: SlideElement[] = composeSlide(content, theme);
       if (textureDataUrl) {
         elements.unshift(buildTextureOverlay(textureDataUrl));

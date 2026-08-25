@@ -48,6 +48,11 @@ export interface AIPresentationResponse {
   presentationTitle: string;
   theme: AIPresentationTheme | ThemeTokens;
   slides: AISlideItem[];
+  /** The PRNG seed this deck's theme + blob geometry were derived from (see
+   * lib/utils/prng.ts). Two calls with the same input content get different
+   * random seeds and therefore visibly different themes/blobs; passing the
+   * same seed back in reproduces an identical deck. */
+  deckSeed?: number;
 }
 
 export type LLMProvider = 'gemini' | 'demo';

@@ -216,7 +216,7 @@ function composeIconBadge(box: Box, content: SlideContent, surface: Surface, z: 
 // Regime: TITLE — the deck's opening monumental poster slide.
 // ---------------------------------------------------------------------------
 function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   let z = 1;
 
   if (content.eyebrow) {
@@ -369,7 +369,7 @@ function composeTitle(content: SlideContent, box: Box, surface: Surface): SlideE
 // Regime: QUOTE — a standalone, centered editorial breather.
 // ---------------------------------------------------------------------------
 function composeQuote(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const quoteWidth = Math.round(box.width * 0.74);
   const quoteX = box.x + Math.round((box.width - quoteWidth) / 2);
   let cursorY = box.y + Math.round(box.height * 0.12);
@@ -573,7 +573,7 @@ function composeMediaSplit(content: SlideContent, box: Box, surface: Surface): S
 // Regime: STAT — a single dominant metric paired with narrative context.
 // ---------------------------------------------------------------------------
 function composeStat(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const [leftBox, rightBox] = computeGrid(2, box, 2);
 
   elements.push(
@@ -690,7 +690,7 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
 // column count and card size are computed from the actual bullet count.
 // ---------------------------------------------------------------------------
 function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideElement[] {
-  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0);
+  const elements: SlideElement[] = generateAmbientBlobs(toPosterPalette(surface), content.index, 0, content.deckSeed);
   const header = composeHeaderRow(box, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(box, content, surface, 1));
 
@@ -902,7 +902,7 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
   const graphicFirst = content.index % 2 === 0;
   const { media: graphicBox, text: textBox } = splitBox(box, graphicFirst);
 
-  elements.push(...generatePosterGraphic(graphicBox, toPosterPalette(surface), content.index, !graphicFirst, 0));
+  elements.push(...generatePosterGraphic(graphicBox, toPosterPalette(surface), content.index, !graphicFirst, 0, content.deckSeed));
 
   const header = composeHeaderRow(textBox, content, surface, 1);
   elements.push(...header.elements, ...composeIconBadge(textBox, content, surface, 1));
