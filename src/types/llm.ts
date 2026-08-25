@@ -35,6 +35,12 @@ export interface AIPresentationTheme {
   textHero?: string;
   border?: string;
   themeId?: string;
+  /** A free-text mood description (e.g. "high-energy tech") the model
+   * emits instead of (or alongside) themeId — decouples theme selection
+   * from a fixed 7-theme lookup so decks on the same topic don't
+   * converge on the same palette every time. See themeGenerator.ts's
+   * hueHintForMood(). */
+  themeMood?: string;
   tokens?: ThemeTokens;
 }
 

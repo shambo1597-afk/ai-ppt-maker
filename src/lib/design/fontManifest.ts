@@ -39,6 +39,51 @@ export const GOOGLE_FONT_SPECS: GoogleFontSpec[] = [
   { family: 'Archivo', weights: [400, 500, 600, 700, 800, 900] },
 ];
 
+export interface FontPairing {
+  fontHeading: string;
+  fontBody: string;
+  singleFamily: boolean;
+}
+
+/**
+ * A pool of real, GOOGLE_FONT_SPECS-safe font pairings for
+ * themeGenerator.ts to pick from — every family referenced here is
+ * already loaded (see GOOGLE_FONT_SPECS above) with the weights it's
+ * used at. 8 two-family pairings + 8 single-family systems, echoing the
+ * ~40/60 single/two-family split real decks show (see the MASTER_THEMES
+ * comment in tokens.ts) without hardcoding the two of seven master
+ * themes' exact pairings as the only single-family option available.
+ *
+ * Single-family entries stick to families with a true upright 400 (or,
+ * for Space Grotesk, 500 — its lightest loaded weight) so body copy
+ * doesn't default to a heavy display weight — except Syne, deliberately
+ * included at 600+ only: a "bold-mono" system in the same spirit as
+ * carbon-mono's Archivo-at-every-weight, not an oversight. Playfair
+ * Display never appears as a body font here for the same reason it
+ * never does in MASTER_THEMES: this manifest only loads it at 600/700
+ * upright (plus a 400 italic for quote styling), no true body weight.
+ */
+export const FONT_PAIRINGS: FontPairing[] = [
+  // Two-family
+  { fontHeading: "'Playfair Display', serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Syne', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Outfit', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: false },
+  { fontHeading: "'Archivo', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: false },
+  { fontHeading: "'Playfair Display', serif", fontBody: "'Manrope', sans-serif", singleFamily: false },
+  // Single-family
+  { fontHeading: "'Inter', sans-serif", fontBody: "'Inter', sans-serif", singleFamily: true },
+  { fontHeading: "'Plus Jakarta Sans', 'Inter', sans-serif", fontBody: "'Plus Jakarta Sans', 'Inter', sans-serif", singleFamily: true },
+  { fontHeading: "'Space Grotesk', sans-serif", fontBody: "'Space Grotesk', sans-serif", singleFamily: true },
+  { fontHeading: "'Outfit', sans-serif", fontBody: "'Outfit', sans-serif", singleFamily: true },
+  { fontHeading: "'Bricolage Grotesque', sans-serif", fontBody: "'Bricolage Grotesque', sans-serif", singleFamily: true },
+  { fontHeading: "'Manrope', sans-serif", fontBody: "'Manrope', sans-serif", singleFamily: true },
+  { fontHeading: "'Archivo', sans-serif", fontBody: "'Archivo', sans-serif", singleFamily: true },
+  { fontHeading: "'Syne', sans-serif", fontBody: "'Syne', sans-serif", singleFamily: true },
+];
+
 function buildFamilyParam(spec: GoogleFontSpec): string {
   const familyParam = spec.family.replace(/\s+/g, '+');
   if (!spec.italicWeights || spec.italicWeights.length === 0) {

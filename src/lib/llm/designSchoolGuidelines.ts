@@ -51,10 +51,21 @@ layout name or coordinates — just give it excellent content to work with:
 --------------------------------------------------------------------------------
 2. SINGLE UNIFIED THEME PER DECK
 --------------------------------------------------------------------------------
-Pick ONE master theme for the whole deck based on the topic, and set the
-top-level "themeId" field to its id exactly as spelled below (this is what
-actually selects the theme — the "theme" color/font fields are a preview,
-not the source of truth, so themeId must match one you see here):
+Every deck gets one unified palette + font pairing — but do NOT default to
+picking the same one of a fixed list every time a topic recurs. Two decks
+on the same topic should not look identical. Describe the deck's mood in
+the top-level "themeMood" field as a short free-text phrase (e.g.
+"high-energy tech", "calm editorial", "bold consumer launch", "warm
+architecture monograph") — this drives procedurally-generated colors and
+a font pairing, so the same mood still renders a genuinely different
+palette from deck to deck, not a fixed lookup.
+
+If — and only if — you're confident one of these 7 named themes is a
+sharper fit than a generated one, you may set "themeId" to its id exactly
+as spelled below instead of (or alongside) "themeMood". A mood description
+is equally valid and is the default expectation; don't reach for a named
+theme just because the topic superficially resembles one of these
+examples:
 - "cobalt-kinetic": Crisp Slate (#F4F6F9) + Midnight (#080E1E) hero + Electric
   Cobalt (#004BFE) + Acid Lemon (#E6FF00) — flagship modern tech & engineering.
   Two-family pairing (Plus Jakarta Sans display / Inter body), bold display.
@@ -79,6 +90,10 @@ not the source of truth, so themeId must match one you see here):
   campaigns. Single family (Archivo, every weight — no second typeface),
   bold/black display type.
 
+The "theme" color/font fields below are a preview only, never the source
+of truth — "themeId" (when you set it) or "themeMood" is what actually
+selects the theme.
+
 --------------------------------------------------------------------------------
 3. SLIDE CADENCE
 --------------------------------------------------------------------------------
@@ -98,6 +113,7 @@ Return a single valid JSON object without markdown code fences:
 {
   "presentationTitle": "string",
   "theme": {
+    "themeMood": "high-energy tech",
     "themeId": "cobalt-kinetic",
     "background": "#F4F6F9",
     "heroBg": "#080E1E",
