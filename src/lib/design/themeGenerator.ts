@@ -86,8 +86,8 @@ export function generateTheme(options: GenerateThemeOptions = {}): ThemeTokens {
       ? (((options.hueHint + (rand() - 0.5) * 40) % 360) + 360) % 360
       : rand() * 360;
 
-  // Real master themes are overwhelmingly light-canvas-with-dark-hero
-  // (6 of 7) with midnight-iridescent the one dark-canvas exception —
+  // Light-canvas-with-dark-hero is the dominant pattern this app's themes
+  // have always leaned toward, with a dark canvas as the rarer exception —
   // roughly 1-in-5 generated themes follow suit. A somber topic almost
   // never rolls a heavy, saturated dark-canvas "energetic" look (see the
   // saturation cap below), so its odds are pushed near zero rather than

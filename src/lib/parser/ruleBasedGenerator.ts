@@ -1,9 +1,8 @@
 import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../../types/llm';
 import { AssetItem } from '../../types/asset';
-import { MASTER_THEMES } from '../design/tokens';
 import { applyRhythmToAISlides } from '../engine/rhythm';
-import { newDeckSeed } from '../utils/prng';
-import { inferGravity } from '../design/themeGenerator';
+import { newDeckSeed, seededRandom } from '../utils/prng';
+import { generateTheme, hueHintForMood, inferGravity } from '../design/themeGenerator';
 
 interface ParsedSection {
   heading: string;
@@ -45,74 +44,17 @@ export function generateDynamicSlidesFromText(
     presentationTitle = lines[0].replace(/^[#*-.\s]+/, '').slice(0, 70).trim();
   }
 
-  // 2. Autonomously Detect Domain Aesthetic & Theme from Master Themes
-  const lowerText = text.toLowerCase();
-  let themeTokens = MASTER_THEMES['cobalt-kinetic'];
-
-  if (
-    lowerText.includes('security') ||
-    lowerText.includes('cyber') ||
-    lowerText.includes('latency') ||
-    lowerText.includes('infrastructure') ||
-    lowerText.includes('cloud') ||
-    lowerText.includes('distributed') ||
-    lowerText.includes('agent') ||
-    lowerText.includes('hardware')
-  ) {
-    themeTokens = MASTER_THEMES['midnight-iridescent'];
-  } else if (
-    lowerText.includes('revenue') ||
-    lowerText.includes('investor') ||
-    lowerText.includes('arr') ||
-    lowerText.includes('growth') ||
-    lowerText.includes('market') ||
-    lowerText.includes('pitch') ||
-    lowerText.includes('series a') ||
-    lowerText.includes('clinical') ||
-    lowerText.includes('genomics') ||
-    lowerText.includes('therapeutics')
-  ) {
-    themeTokens = MASTER_THEMES['nordic-slate'];
-  } else if (
-    lowerText.includes('swiss') ||
-    lowerText.includes('studio') ||
-    lowerText.includes('minimal') ||
-    lowerText.includes('framework')
-  ) {
-    themeTokens = MASTER_THEMES['swiss-studio'];
-  } else if (
-    lowerText.includes('architecture') ||
-    lowerText.includes('monograph') ||
-    lowerText.includes('design') ||
-    lowerText.includes('editorial')
-  ) {
-    themeTokens = MASTER_THEMES['warm-editorial'];
-  } else if (
-    lowerText.includes('launch') ||
-    lowerText.includes('campaign') ||
-    lowerText.includes('startup') ||
-    lowerText.includes('consumer')
-  ) {
-    themeTokens = MASTER_THEMES['carbon-mono'];
-  } else if (
-    lowerText.includes('wellness') ||
-    lowerText.includes('lifestyle') ||
-    lowerText.includes('craft') ||
-    lowerText.includes('community') ||
-    lowerText.includes('culture')
-  ) {
-    themeTokens = MASTER_THEMES['porcelain-light'];
-  }
-
-  // Surfaced for any downstream consumer (or a future extension of this
-  // path) even though the 7 MASTER_THEMES picked above aren't gravity-
-  // aware themselves — this deliberately doesn't reach into themeTokens'
-  // own colors/decoration, since that would mean a keyword match like
-  // "midnight-iridescent" no longer renders as its own curated palette.
-  // Content-tone constrained generation (saturation/darkCanvas/fonts/
-  // blobs) is fully wired for the LLM path (see client.ts's
-  // cleanAndParseJsonResponse), the only path that calls generateTheme().
-  const themeGravity = inferGravity(text);
+  // 2. Generate a theme, seeded the same way the cloud path is (client.ts's
+  // cleanAndParseJsonResponse): a procedurally generated palette, hue-
+  // biased by the brief's own topic keywords (hueHintForMood(), the same
+  // keyword table the LLM path's themeMood hint resolves against) and
+  // constrained by the brief's inferred content-tone gravity, deterministic
+  // for this deck's own seed. There's no fixed theme registry to match
+  // against any more, so — unlike the old keyword ladder this replaces —
+  // every keyword bucket now only ever biases a hue, never picks a fixed
+  // palette outright.
+  const gravity = inferGravity(text);
+  const themeTokens = generateTheme({ hueHint: hueHintForMood(text), gravity, rand: seededRandom(deckSeed) });
 
   const theme: AIPresentationTheme = {
     background: themeTokens.canvasBg,
@@ -126,7 +68,7 @@ export function generateDynamicSlidesFromText(
     fontHeader: themeTokens.fontHeading,
     fontBody: themeTokens.fontBody,
     themeId: themeTokens.id,
-    themeGravity,
+    themeGravity: gravity,
     tokens: themeTokens,
   };
 
@@ -308,7 +250,7 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
 }
 
 function generateEmptyPresentation(deckSeed: number = newDeckSeed()): AIPresentationResponse {
-  const themeTokens = MASTER_THEMES['cobalt-kinetic'];
+  const themeTokens = generateTheme({ rand: seededRandom(deckSeed) });
   return {
     presentationTitle: 'Presentation',
     theme: {
@@ -318,6 +260,7 @@ function generateEmptyPresentation(deckSeed: number = newDeckSeed()): AIPresenta
       fontHeader: themeTokens.fontHeading,
       fontBody: themeTokens.fontBody,
       themeId: themeTokens.id,
+      tokens: themeTokens,
     },
     slides: [
       {

@@ -98,9 +98,8 @@ interface Surface {
   /** True when this theme was generated with gravity: 'somber' (see
    * themeGenerator.ts) — every organic-blob call site below no-ops when
    * this is set, so a serious topic never gets the same bouncy decorative
-   * flourish as an energetic one. Undefined/false for every MASTER_THEMES
-   * entry and every neutral/energetic generated theme: unchanged from
-   * today's behavior. */
+   * flourish as an energetic one. Undefined/false for every neutral/
+   * energetic theme: unchanged from today's behavior. */
   isSomber: boolean;
 }
 

@@ -3,7 +3,6 @@ import { AIPresentationResponse, LLMConfig, AISlideItem } from '../../types/llm'
 import { AssetItem } from '../../types/asset';
 import { getDesignSchoolSystemPrompt } from './designSchoolGuidelines';
 import { generateDynamicSlidesFromText } from '../parser/ruleBasedGenerator';
-import { MASTER_THEMES } from '../design/tokens';
 import { generateTheme, hueHintForMood, inferGravity, Gravity } from '../design/themeGenerator';
 import { applyRhythmToAISlides } from '../engine/rhythm';
 import { seededRandom, newDeckSeed } from '../utils/prng';
@@ -171,16 +170,13 @@ export function cleanAndParseJsonResponse(
     throw new Error('Invalid presentation structure: "slides" array is missing or empty.');
   }
 
-  // themeId is an exact, deliberate choice — honor it precisely. Anything
-  // else (no themeId, or one that doesn't name a real master theme) is
-  // NOT a cue to silently default to Cobalt Kinetic: it means the model
-  // described a mood instead (per the prompt's "a mood description is
-  // equally valid" guidance), so generate a genuinely new theme biased
-  // toward that mood's hue family — this is what actually decouples
-  // theme selection from topic, since two decks with the same mood still
-  // land on two different generated palettes.
+  // Every theme is procedurally generated — there is no fixed named-theme
+  // registry to look up any more, so themeId (if the model still sends
+  // one out of habit) is ignored entirely. themeMood is what actually
+  // biases the result's hue family; this is what decouples theme
+  // selection from topic, since two decks with the same mood still land
+  // on two different generated palettes.
   const rawTheme = parsed.theme || {};
-  const explicitThemeId: string | undefined = rawTheme.themeId;
 
   // themeGravity is a deliberate, independent-of-hue classification — honor
   // it exactly when the model gave a valid one. When it's missing (an
@@ -198,16 +194,15 @@ export function cleanAndParseJsonResponse(
     ? rawTheme.themeGravity
     : inferGravity(gravityInferenceText);
 
-  const themeTokens =
-    explicitThemeId && MASTER_THEMES[explicitThemeId]
-      ? MASTER_THEMES[explicitThemeId]
-      : generateTheme({ hueHint: hueHintForMood(rawTheme.themeMood), gravity, rand: seededRandom(deckSeed) });
+  const themeTokens = generateTheme({ hueHint: hueHintForMood(rawTheme.themeMood), gravity, rand: seededRandom(deckSeed) });
   parsed.theme = {
-    // Carry the resolved theme's own id forward so any later
-    // resolveThemeTokens() call (slideComposer.ts resolves again) hits the
-    // same exact-match path instead of reconstructing a lossy approximation
-    // from hex fields — that reconstruction has no way to recover fields
-    // like displayWeight, which aren't part of the hex/font preview at all.
+    // `tokens` below carries the full generated ThemeTokens forward so any
+    // later resolveThemeTokens() call (slideComposer.ts resolves again)
+    // recovers it exactly instead of reconstructing a lossy approximation
+    // from the flat hex fields below — that reconstruction has no way to
+    // recover fields like displayWeight/gravity, which aren't part of the
+    // hex/font preview at all. themeId is kept only as a human-readable
+    // label; nothing resolves theme identity by it any more.
     themeId: themeTokens.id,
     background: themeTokens.canvasBg,
     heroBg: themeTokens.heroBg,

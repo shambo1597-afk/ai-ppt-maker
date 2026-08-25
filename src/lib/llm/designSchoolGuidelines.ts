@@ -51,47 +51,18 @@ layout name or coordinates — just give it excellent content to work with:
 --------------------------------------------------------------------------------
 2. SINGLE UNIFIED THEME PER DECK
 --------------------------------------------------------------------------------
-Every deck gets one unified palette + font pairing — but do NOT default to
-picking the same one of a fixed list every time a topic recurs. Two decks
-on the same topic should not look identical. Describe the deck's mood in
-the top-level "themeMood" field as a short free-text phrase (e.g.
-"high-energy tech", "calm editorial", "bold consumer launch", "warm
-architecture monograph") — this drives procedurally-generated colors and
-a font pairing, so the same mood still renders a genuinely different
-palette from deck to deck, not a fixed lookup.
-
-If — and only if — you're confident one of these 7 named themes is a
-sharper fit than a generated one, you may set "themeId" to its id exactly
-as spelled below instead of (or alongside) "themeMood". A mood description
-is equally valid and is the default expectation; don't reach for a named
-theme just because the topic superficially resembles one of these
-examples:
-- "cobalt-kinetic": Crisp Slate (#F4F6F9) + Midnight (#080E1E) hero + Electric
-  Cobalt (#004BFE) + Acid Lemon (#E6FF00) — flagship modern tech & engineering.
-  Two-family pairing (Plus Jakarta Sans display / Inter body), bold display.
-- "warm-editorial": Warm Linen (#FBF8F3) + Obsidian (#0A0D17) hero + Terracotta
-  (#B85042) / Amber (#D97706) — architecture, monograph, design. Two-family
-  pairing (Playfair Display / Inter), bold display.
-- "swiss-studio": Clean Chalk (#F4F4F6) + Jet Black (#0A0D14) hero + Klein Blue
-  (#0044EE) — strategy, frameworks, systems. Two-family pairing (Space
-  Grotesk / Inter), bold display.
-- "nordic-slate": Pale Slate (#F0F4F8) + Deep Navy (#0F172A) hero + Azure
-  (#0284C7) — enterprise, finance, healthcare. Two-family pairing (Plus
-  Jakarta Sans / Inter), bold display.
-- "midnight-iridescent": Charcoal (#111319) + Pure Black (#07090E) hero +
-  Amber/Emerald (#F59E0B / #10B981) — genomics, biotech, deep tech. Two-family
-  pairing (Syne / Inter), bold display.
-- "porcelain-light": Warm Porcelain (#FAF8F5) + Charcoal (#161A1D) hero + Sage
-  (#5C7C6C) + Clay (#E3A98F) — wellness, lifestyle, craft, culture, calm
-  editorial storytelling. Single family (Manrope, every weight — no second
-  typeface), light/airy display type.
-- "carbon-mono": Cool Gray (#F4F4F5) + True Black (#0A0A0B) hero + Coral-Red
-  (#FF4B3E) + Yellow (#FFD23F) — product launches, startups, consumer,
-  campaigns. Single family (Archivo, every weight — no second typeface),
-  bold/black display type.
+Every deck gets one unified palette + font pairing, procedurally generated
+— there is no fixed list of named themes to pick from, so do NOT invent
+or guess at a theme name/id. Two decks on the same topic should not look
+identical. Describe the deck's mood in the top-level "themeMood" field as
+a short free-text phrase (e.g. "high-energy tech", "calm editorial", "bold
+consumer launch", "warm architecture monograph") — this drives
+procedurally-generated colors and a font pairing, so the same mood still
+renders a genuinely different palette from deck to deck, not a fixed
+lookup.
 
 The "theme" color/font fields below are a preview only, never the source
-of truth — "themeId" (when you set it) or "themeMood" is what actually
+of truth — "themeMood" (and "themeGravity", see below) is what actually
 selects the theme.
 
 Separately from mood, also set "themeGravity" — a classification of how
@@ -128,7 +99,6 @@ Return a single valid JSON object without markdown code fences:
   "theme": {
     "themeMood": "high-energy tech",
     "themeGravity": "neutral",
-    "themeId": "cobalt-kinetic",
     "background": "#F4F6F9",
     "heroBg": "#080E1E",
     "cardBg": "#FFFFFF",
