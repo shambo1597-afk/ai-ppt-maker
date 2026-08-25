@@ -1,5 +1,6 @@
 import grammarJson from './designGrammar.json';
 import { hexToHsl, hslToHex } from './colorMath';
+import { weightedPick } from '../utils/prng';
 
 /**
  * Design Grammar — spatial math mined from the real Canva decks in
@@ -121,14 +122,50 @@ export interface DerivedGradient {
 }
 
 /**
- * Apply the mined gradient *rule* (lighten/desaturate/hue-drift the second
- * stop by roughly what real Canva gradients do) to a theme's own base
- * color, instead of replaying the literal blue palette that rule was mined
- * from. `intensity` scales the effect (1 = the rule as mined, 0.5 = half
- * as dramatic) for softer background washes vs. bolder accent moments.
+ * The learned relationship for one specific observed gradient pair — same
+ * shape as GradientRule, but derived on the fly from a single (from, to)
+ * hex pair instead of the flattened deck-wide aggregate.
  */
-export function deriveGradient(baseHex: string, intensity: number = 1): DerivedGradient {
-  const rule = DESIGN_GRAMMAR.gradientRule;
+function ruleFromPair(pair: GradientPair): GradientRule {
+  const from = hexToHsl(pair.from);
+  const to = hexToHsl(pair.to);
+  if (!from || !to) return DESIGN_GRAMMAR.gradientRule;
+
+  // Shortest-path hue delta (e.g. 350deg -> 10deg is +20, not +340).
+  const hueShiftDeg = (((to.h - from.h + 180) % 360) + 360) % 360 - 180;
+
+  return {
+    hueShiftDeg,
+    lightnessDelta: to.l - from.l,
+    saturationDelta: to.s - from.s,
+    direction: pair.direction,
+  };
+}
+
+/**
+ * Apply a real gradient's *relationship* (lighten/desaturate/hue-drift the
+ * second stop by roughly what that specific Canva pair does) to a theme's
+ * own base color, instead of replaying the literal palette it was mined
+ * from. `intensity` scales the effect (1 = the relationship as mined, 0.5 =
+ * half as dramatic) for softer background washes vs. bolder accent moments.
+ *
+ * The 30-deck sample turned up more than one gradient *family* — a
+ * blue-toward-white lightening wash (the dominant one) alongside a rarer
+ * red-toward-near-black darkening one on a different direction — collapsing
+ * them into a single deck-wide aggregate rule would silently average that
+ * diversity away. Instead this weighted-samples (by observed count, same
+ * as themeGenerator.ts's contrast-pair picks) across the real
+ * DESIGN_GRAMMAR.gradientPairs and derives the relationship from whichever
+ * one it lands on, so a generated theme can land on either family — while
+ * an explicit `rand` still makes that pick fully reproducible from a
+ * deck/blob seed. Defaults to Math.random for ordinary "give me something
+ * new" calls, and falls back to the flattened aggregate gradientRule only
+ * if no real pairs are available at all.
+ */
+export function deriveGradient(baseHex: string, intensity: number = 1, rand: () => number = Math.random): DerivedGradient {
+  const pairs = DESIGN_GRAMMAR.gradientPairs.length > 0 ? DESIGN_GRAMMAR.gradientPairs : FALLBACK_GRAMMAR.gradientPairs;
+  const rule = pairs.length > 0 ? ruleFromPair(weightedPick(pairs, rand)) : DESIGN_GRAMMAR.gradientRule;
+
   const base = hexToHsl(baseHex);
   if (!base) {
     return { from: baseHex, to: baseHex, direction: rule.direction };

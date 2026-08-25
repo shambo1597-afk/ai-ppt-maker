@@ -2,6 +2,7 @@ import type { ThemeTokens } from './tokens';
 import { hexToHsl, hslToHex, mixHex } from './colorMath';
 import { DESIGN_GRAMMAR, deriveGradient, ContrastPair } from './designGrammar';
 import { FONT_PAIRINGS } from './fontManifest';
+import { weightedPick } from '../utils/prng';
 
 /**
  * Procedural theme generation — the antidote to every deck on the same
@@ -22,20 +23,6 @@ export interface GenerateThemeOptions {
    * seed generation — see prng.ts / deckSeed threading. Defaults to
    * Math.random for ordinary "give me something new" calls. */
   rand?: () => number;
-}
-
-/** Weighted-by-count random pick — favors contrast pairs (or any counted
- * item) the real decks actually used more often, instead of treating a
- * pair seen once and a pair seen thirty times as equally likely. */
-function weightedPick<T extends { count: number }>(items: T[], rand: () => number): T {
-  const total = items.reduce((sum, item) => sum + item.count, 0);
-  if (total <= 0) return items[0];
-  let roll = rand() * total;
-  for (const item of items) {
-    roll -= item.count;
-    if (roll <= 0) return item;
-  }
-  return items[items.length - 1];
 }
 
 /**
@@ -101,7 +88,7 @@ export function generateTheme(options: GenerateThemeOptions = {}): ThemeTokens {
   // so a smaller intensity keeps the badge a second *vivid* highlight
   // color (the real accentBadge role — e.g. Acid Lemon next to Electric
   // Cobalt) rather than washing the accent out toward white.
-  const accentBadge = deriveGradient(accent, 0.35 + rand() * 0.3).to;
+  const accentBadge = deriveGradient(accent, 0.35 + rand() * 0.3, rand).to;
 
   const textPrimary = deriveTextColor(canvasBg, hue, rand);
   const textHero = deriveTextColor(heroBg, hue, rand);
