@@ -1,31 +1,37 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-08-23T19:09:46.332Z",
-  "sourceDeckCount": 10,
-  "sourceSlideCount": 120,
+  "generatedAt": "2026-08-25T07:09:47.695Z",
+  "sourceDeckCount": 30,
+  "sourceSlideCount": 337,
   "margins": {
     "xRatio": 0.05625,
-    "yRatio": 0.1037037037037037
+    "yRatio": 0.10462962962962963
   },
   "typeScale": {
-    "titleToCanvasHeightRatio": 0.0824074074074074,
+    "titleToCanvasHeightRatio": 0.09537037037037037,
     "bodyToCanvasHeightRatio": 0.016666666666666666,
-    "titleToBodyRatio": 4.904761904761905
+    "titleToBodyRatio": 5
   },
   "spacing": {
-    "stackGapRatio": 0.05,
+    "stackGapRatio": 0.05462962962962963,
     "columnGutterRatio": 0.06
   },
-  "imageColumnRatio": 0.37005208333333334,
+  "imageColumnRatio": 0.31875,
   "contentDensity": {
-    "medianTextBlocksPerSlide": 7
+    "medianTextBlocksPerSlide": 5
   },
   "contrastPairs": [
     {
       "bg": "#000000",
       "fg": "#FFFFFF",
       "contrast": 21,
-      "count": 30
+      "count": 52
+    },
+    {
+      "bg": "#000000",
+      "fg": "#EBC118",
+      "contrast": 12.17,
+      "count": 14
     },
     {
       "bg": "#000000",
@@ -40,10 +46,34 @@
       "count": 10
     },
     {
+      "bg": "#FAFAFA",
+      "fg": "#1D1817",
+      "contrast": 16.83,
+      "count": 9
+    },
+    {
+      "bg": "#FFFCF6",
+      "fg": "#292B2D",
+      "contrast": 13.88,
+      "count": 9
+    },
+    {
+      "bg": "#000000",
+      "fg": "#F6F0E4",
+      "contrast": 18.5,
+      "count": 8
+    },
+    {
       "bg": "#F5EEDD",
       "fg": "#06202B",
       "contrast": 14.53,
       "count": 8
+    },
+    {
+      "bg": "#FDFDFD",
+      "fg": "#000000",
+      "contrast": 20.65,
+      "count": 7
     },
     {
       "bg": "#1351AA",
@@ -52,64 +82,40 @@
       "count": 6
     },
     {
+      "bg": "#FFFCE8",
+      "fg": "#151515",
+      "contrast": 17.69,
+      "count": 5
+    },
+    {
+      "bg": "#F2F2F0",
+      "fg": "#131313",
+      "contrast": 16.58,
+      "count": 5
+    },
+    {
       "bg": "#FFFEF9",
       "fg": "#2A4840",
       "contrast": 9.91,
       "count": 5
     },
     {
-      "bg": "#231F20",
-      "fg": "#F5F5F5",
-      "contrast": 14.95,
-      "count": 4
+      "bg": "#3D3D3D",
+      "fg": "#E9E9E9",
+      "contrast": 8.95,
+      "count": 5
     },
     {
-      "bg": "#E3E2DE",
-      "fg": "#1351AA",
-      "contrast": 5.82,
-      "count": 4
+      "bg": "#A9170B",
+      "fg": "#FFFCE8",
+      "contrast": 7.23,
+      "count": 5
     },
     {
-      "bg": "#231F20",
-      "fg": "#FFFFFF",
-      "contrast": 16.3,
-      "count": 3
-    },
-    {
-      "bg": "#F5EEDD",
-      "fg": "#0B0A0A",
-      "contrast": 17.1,
-      "count": 2
-    },
-    {
-      "bg": "#EBE2CD",
-      "fg": "#000000",
-      "contrast": 16.29,
-      "count": 2
-    },
-    {
-      "bg": "#149941",
-      "fg": "#F9F7F4",
-      "contrast": 3.47,
-      "count": 2
-    },
-    {
-      "bg": "#FFFEF9",
-      "fg": "#0E2821",
-      "contrast": 15.47,
-      "count": 1
-    },
-    {
-      "bg": "#F9F7F4",
-      "fg": "#737373",
-      "contrast": 4.43,
-      "count": 1
-    },
-    {
-      "bg": "#149941",
-      "fg": "#202121",
-      "contrast": 4.35,
-      "count": 1
+      "bg": "#FF751F",
+      "fg": "#131313",
+      "contrast": 6.92,
+      "count": 5
     }
   ],
   "gradientPairs": [
@@ -126,6 +132,12 @@
       "count": 45
     },
     {
+      "from": "#B80000",
+      "to": "#440000",
+      "direction": "to-b",
+      "count": 10
+    },
+    {
       "from": "#23539D",
       "to": "#A7C3E8",
       "direction": "to-br",
@@ -136,23 +148,50 @@
       "to": "#D3E6FF",
       "direction": "to-br",
       "count": 1
+    },
+    {
+      "from": "#4182D7",
+      "to": "#ADBBDB",
+      "direction": "to-b",
+      "count": 1
     }
   ],
   "gradientRule": {
     "hueShiftDeg": -7.3,
     "lightnessDelta": 0.378,
-    "saturationDelta": -0.907,
+    "saturationDelta": -0.585,
     "direction": "to-br"
   },
   "fontPairing": {
-    "singleFamilyRatio": 0.4,
+    "singleFamilyRatio": 0.27,
     "displayWeightCounts": {
-      "regular": 5,
-      "light": 1,
-      "bold": 4
+      "bold": 17,
+      "regular": 12,
+      "light": 1
     },
-    "sampleCount": 10,
+    "sampleCount": 30,
     "samples": [
+      {
+        "sourceFile": "Black And White Space Bold Pitch Deck Presentation.pptx",
+        "displayFont": "Antonio Bold",
+        "bodyFont": "Poppins",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Black Red Vintage Classic Movie Presentation.pptx",
+        "displayFont": "AC Compacta",
+        "bodyFont": "Open Sans",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Black and White Classic Vintage Art History Presentation.pptx",
+        "displayFont": "Noto Serif Display ExtraCondensed Bold Italics",
+        "bodyFont": "Questrial",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
       {
         "sourceFile": "Blue Bold Project Proposal Presentation.pptx",
         "displayFont": "Buongiorno Rastellino",
@@ -168,11 +207,25 @@
         "displayWeight": "regular"
       },
       {
+        "sourceFile": "Blue Modern Social Media Campaign Strategy Presentation.pptx",
+        "displayFont": "Knockout Cruiserweight Bold",
+        "bodyFont": "Knockout Cruiserweight",
+        "sameFamily": true,
+        "displayWeight": "bold"
+      },
+      {
         "sourceFile": "Blue and Black Minimalist Business Presentation.pptx",
         "displayFont": "Bricolage Grotesque",
         "bodyFont": "Open Sauce",
         "sameFamily": false,
         "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Brown Red Scrapbook Portfolio Presentation.pptx",
+        "displayFont": "FF Providence Sans Bold",
+        "bodyFont": "Helvetica World",
+        "sameFamily": false,
+        "displayWeight": "bold"
       },
       {
         "sourceFile": "Cybersecurity Roadmap Illustrative Green Presentation.pptx",
@@ -189,6 +242,20 @@
         "displayWeight": "light"
       },
       {
+        "sourceFile": "Green Black and White Modern Marketing Strategy Presentation.pptx",
+        "displayFont": "Neue Montreal Medium",
+        "bodyFont": "Neue Montreal Bold",
+        "sameFamily": true,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Green Modern Brand Guideline Presentation.pptx",
+        "displayFont": "Open Sauce Heavy",
+        "bodyFont": "Liberation Sans",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
         "sourceFile": "Green and Black Modern Fintech Evolution Presentation.pptx",
         "displayFont": "TT Hoves Bold",
         "bodyFont": "Open Sans",
@@ -203,9 +270,58 @@
         "displayWeight": "bold"
       },
       {
+        "sourceFile": "Green and Yellow Typographic Aesthetic Nature Presentation.pptx",
+        "displayFont": "Sloop Script Pro",
+        "bodyFont": "Noto Serif Bengali SemiCondensed",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
         "sourceFile": "Grey Bold Minimalist Project Proposal Presentation.pptx",
         "displayFont": "Aileron Heavy",
         "bodyFont": "Work Sans",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Orange Modern Editorial Pitch Deck for a Creative Studio Presentation.pptx",
+        "displayFont": "Anton",
+        "bodyFont": "Helvetica Now Display Heavy",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Orange and Black Bold Grunge Digital Marketing Presentation.pptx",
+        "displayFont": "Anton",
+        "bodyFont": "Open Sauce Light",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Orange and White Modern Pitch Deck Presentation.pptx",
+        "displayFont": "Poppins Bold",
+        "bodyFont": "Aileron",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Red Gray Bold Poland Presentation.pptx",
+        "displayFont": "Poppins Bold",
+        "bodyFont": "Poppins",
+        "sameFamily": true,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Red Green Bold Afghanistan Presentation.pptx",
+        "displayFont": "Poppins Bold",
+        "bodyFont": "Poppins",
+        "sameFamily": true,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "Red White Bold China Presentation.pptx",
+        "displayFont": "Poppins Bold",
+        "bodyFont": "DM Sans",
         "sameFamily": false,
         "displayWeight": "bold"
       },
@@ -217,11 +333,53 @@
         "displayWeight": "bold"
       },
       {
+        "sourceFile": "Red and Black Bold Modern Digital Marketing Presentation.pptx",
+        "displayFont": "Antonio Bold",
+        "bodyFont": "Open Sans Condensed",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
         "sourceFile": "Red and Black Modern Clean Cyber Security Presentation.pptx",
         "displayFont": "AC Steelfish",
         "bodyFont": "Roboto Condensed",
         "sameFamily": false,
         "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "Red and White Modern Minimalist Creative Portfolio Presentation.pptx",
+        "displayFont": "Agrandir Heavy",
+        "bodyFont": "Helvetica Now",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "TV & Film Pitch Deck Presentation in Black and White Red Dark & Serious Style.pptx",
+        "displayFont": "AC Compacta",
+        "bodyFont": "TT Mussels",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "White Blue Bold Minimalist India Presentation.pptx",
+        "displayFont": "Poppins Bold",
+        "bodyFont": "DM Sans",
+        "sameFamily": false,
+        "displayWeight": "bold"
+      },
+      {
+        "sourceFile": "White and Black Modern Playful Pitch Deck Presentation.pptx",
+        "displayFont": "Le Petit Cochon",
+        "bodyFont": "Aileron",
+        "sameFamily": false,
+        "displayWeight": "regular"
+      },
+      {
+        "sourceFile": "White and Blue Modern Creative Brief Presentation.pptx",
+        "displayFont": "Helvetica Now Bold",
+        "bodyFont": "Aileron",
+        "sameFamily": false,
+        "displayWeight": "bold"
       }
     ]
   }
