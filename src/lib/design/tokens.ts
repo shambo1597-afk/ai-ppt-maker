@@ -1,4 +1,5 @@
 import { generateTheme } from './themeGenerator';
+import type { Gravity } from './themeGenerator';
 
 export interface ThemeTokens {
   id: string;
@@ -23,6 +24,15 @@ export interface ThemeTokens {
    * defaults to 'bold' so every existing theme's behavior is unchanged.
    */
   displayWeight?: 'light' | 'bold';
+  /**
+   * Content-tone axis this theme was generated with (see
+   * themeGenerator.ts's Gravity type) — undefined for the 7 curated
+   * MASTER_THEMES, which aren't gravity-aware and stay exactly as
+   * designed regardless of a deck's inferred tone. composer.ts reads this
+   * to decide whether organic blob decoration should appear at all: a
+   * 'somber' theme skips it outright.
+   */
+  gravity?: Gravity;
 }
 
 /**

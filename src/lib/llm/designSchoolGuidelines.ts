@@ -94,6 +94,19 @@ The "theme" color/font fields below are a preview only, never the source
 of truth — "themeId" (when you set it) or "themeMood" is what actually
 selects the theme.
 
+Separately from mood, also set "themeGravity" — a classification of how
+SERIOUS the actual subject matter is, independent of whatever hue/energy
+"themeMood" describes:
+- "somber": medical crises, pandemics, layoffs, lawsuits, bankruptcy,
+  disasters, grief, or any other loss-of-life or loss-of-livelihood topic.
+- "neutral": standard business content, reports, technical documentation,
+  educational material — the default when nothing marks it either way.
+- "energetic": product launches, marketing campaigns, consumer brands,
+  celebratory announcements.
+A somber topic must never be classified "energetic" even if the brief also
+uses upbeat language elsewhere — when genuinely unsure between "somber"
+and "neutral", prefer "neutral".
+
 --------------------------------------------------------------------------------
 3. SLIDE CADENCE
 --------------------------------------------------------------------------------
@@ -114,6 +127,7 @@ Return a single valid JSON object without markdown code fences:
   "presentationTitle": "string",
   "theme": {
     "themeMood": "high-energy tech",
+    "themeGravity": "neutral",
     "themeId": "cobalt-kinetic",
     "background": "#F4F6F9",
     "heroBg": "#080E1E",
