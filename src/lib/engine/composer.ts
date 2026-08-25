@@ -965,6 +965,24 @@ function composeTypographic(content: SlideContent, box: Box, surface: Surface): 
 }
 
 /**
+ * The structural regime composeSlide() derives from which content facets
+ * are present — factored out to its own detectRegime() so anything that
+ * needs to know a slide's regime without composing it (rhythm.ts's
+ * enforceSlideRhythm) uses the exact same facet-detection rules instead
+ * of a second, driftable copy of them.
+ */
+export type Regime = 'title' | 'quote' | 'media-split' | 'stat' | 'grid' | 'typographic';
+
+export function detectRegime(content: SlideContent): Regime {
+  if (content.isTitleSlide) return 'title';
+  if (content.quote) return 'quote';
+  if (content.imageUrl) return 'media-split';
+  if (content.stat) return 'stat';
+  if (content.bullets.length >= 2) return 'grid';
+  return 'typographic';
+}
+
+/**
  * Compose the full element scene graph for one slide of content. This is
  * the only place layout decisions are made — the resulting SlideElement[]
  * is consumed identically by the live canvas renderer and the PPTX
@@ -974,10 +992,18 @@ export function composeSlide(content: SlideContent, theme: ThemeTokens): SlideEl
   const box = getContentBox();
   const surface = resolveSurface(theme, isHeroSurface(content));
 
-  if (content.isTitleSlide) return composeTitle(content, box, surface);
-  if (content.quote) return composeQuote(content, box, surface);
-  if (content.imageUrl) return composeMediaSplit(content, box, surface);
-  if (content.stat) return composeStat(content, box, surface);
-  if (content.bullets.length >= 2) return composeGrid(content, box, surface);
-  return composeTypographic(content, box, surface);
+  switch (detectRegime(content)) {
+    case 'title':
+      return composeTitle(content, box, surface);
+    case 'quote':
+      return composeQuote(content, box, surface);
+    case 'media-split':
+      return composeMediaSplit(content, box, surface);
+    case 'stat':
+      return composeStat(content, box, surface);
+    case 'grid':
+      return composeGrid(content, box, surface);
+    case 'typographic':
+      return composeTypographic(content, box, surface);
+  }
 }

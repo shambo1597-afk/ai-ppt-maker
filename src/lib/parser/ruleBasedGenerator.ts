@@ -1,6 +1,7 @@
 import { AIPresentationResponse, AISlideItem, AIPresentationTheme } from '../../types/llm';
 import { AssetItem } from '../../types/asset';
 import { MASTER_THEMES } from '../design/tokens';
+import { applyRhythmToAISlides } from '../engine/rhythm';
 
 interface ParsedSection {
   heading: string;
@@ -186,10 +187,14 @@ export function generateDynamicSlidesFromText(
     });
   }
 
+  // designSchoolGuidelines.ts's LLM-facing "vary slide types" guidance
+  // has no equivalent for this deterministic local path at all — a
+  // process-heavy brief parses into GRID slide after GRID slide every
+  // single time without this.
   return {
     presentationTitle,
     theme,
-    slides: slides.slice(0, targetSlideCount),
+    slides: applyRhythmToAISlides(slides.slice(0, targetSlideCount)),
   };
 }
 

@@ -5,6 +5,7 @@ import { getDesignSchoolSystemPrompt } from './designSchoolGuidelines';
 import { generateDynamicSlidesFromText } from '../parser/ruleBasedGenerator';
 import { MASTER_THEMES } from '../design/tokens';
 import { generateTheme, hueHintForMood } from '../design/themeGenerator';
+import { applyRhythmToAISlides } from '../engine/rhythm';
 
 export const SYSTEM_PROMPT = getDesignSchoolSystemPrompt();
 
@@ -98,6 +99,10 @@ INSTRUCTIONS FOR USER ASSETS:
       const rawText = res.text || '';
       if (rawText) {
         const parsed = cleanAndParseJsonResponse(rawText, assets);
+        // designSchoolGuidelines.ts *asks* the model to vary slide types,
+        // but nothing enforces it — a process-heavy brief reliably
+        // produces a run of GRID slides regardless. Enforce it in code.
+        parsed.slides = applyRhythmToAISlides(parsed.slides);
         console.log(`SLIDES GENERATED SUCCESSFULLY (${modelName}):`, parsed);
         return parsed;
       }
