@@ -2,6 +2,7 @@ import { SlideElement } from '../../types/slide';
 import { deriveGradient } from '../design/designGrammar';
 import { Box, CANVAS_H, CANVAS_W } from './grid';
 import { generateBlobPath, hashSeed } from './organicShapes';
+import { seededRandom } from '../utils/prng';
 
 let counter = 0;
 function nextId(prefix: string): string {
@@ -72,7 +73,12 @@ function twoToneBlobCluster(
   zIndexBase: number,
   deckSeed: number
 ): SlideElement[] {
-  const { to: tint } = deriveGradient(baseColor, 1);
+  // deriveGradient() now weighted-samples across the real observed
+  // gradient pairs (see designGrammar.ts) rather than one flattened rule —
+  // an explicit seeded rand keeps that pick (and therefore this tint)
+  // reproducible for a given deckSeed, matching this cluster's own blob
+  // seeds below.
+  const { to: tint } = deriveGradient(baseColor, 1, seededRandom(hashSeed(deckSeed, seedBase, 3)));
   const outward = facesRight ? box.x + box.width : box.x;
   const bigSize = Math.round(box.height * 0.66);
   const smallSize = Math.round(bigSize * 0.62);
@@ -208,7 +214,9 @@ export function generateAmbientBlobs(
 ): SlideElement[] {
   const corner = slideIndex % 2 === 0 ? 'br' : 'tl';
   const size = Math.round(CANVAS_H * 0.85);
-  const { to: tint } = deriveGradient(theme.accent, 0.6);
+  // See twoToneBlobCluster's own comment: seeded so the weighted gradient-
+  // pair pick stays reproducible for a given deckSeed.
+  const { to: tint } = deriveGradient(theme.accent, 0.6, seededRandom(hashSeed(deckSeed, slideIndex, 22)));
 
   const x = corner === 'br' ? CANVAS_W - size * 0.55 : -size * 0.35;
   const y = corner === 'br' ? CANVAS_H - size * 0.55 : -size * 0.35;

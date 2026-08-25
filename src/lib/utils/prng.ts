@@ -30,3 +30,23 @@ export function seededRandom(seed: number): () => number {
 export function newDeckSeed(): number {
   return (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
 }
+
+/** Weighted-by-count random pick — favors items the real mined decks
+ * actually used more often (a contrast pair seen thirty times vs. one seen
+ * once) instead of treating every observed item as equally likely.
+ *
+ * Lives here (not in lib/design/themeGenerator.ts, its original home)
+ * because lib/design/designGrammar.ts now needs it too (to weighted-pick a
+ * real gradient pair — see deriveGradient()), and themeGenerator.ts itself
+ * imports from designGrammar.ts, so putting it in either design/ module
+ * would create a cycle. */
+export function weightedPick<T extends { count: number }>(items: T[], rand: () => number): T {
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  if (total <= 0) return items[0];
+  let roll = rand() * total;
+  for (const item of items) {
+    roll -= item.count;
+    if (roll <= 0) return item;
+  }
+  return items[items.length - 1];
+}
