@@ -206,6 +206,13 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
   let statLabel: string | undefined;
   let quote: string | undefined;
   let author: string | undefined;
+  // The first metric-shaped bullet found, if any — only promoted to an
+  // actual statValue/statLabel after the loop, once we know whether this
+  // section turned out to have exactly one point (a real hero metric) or
+  // several (a parallel metrics list — see the points.length === 1 gate
+  // below, and designSchoolGuidelines.ts's matching instruction for the
+  // LLM path).
+  let statCandidate: { point: string; value: string } | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -236,31 +243,21 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
       const cleanPoint = stripMarkdownSyntax(line);
       points.push(cleanPoint);
 
-      // Check for numeric metrics in the bullet. The trailing boundary is
-      // a negative lookahead rather than \b: \b only fires between a word
-      // and non-word character, so it never matches after a symbol unit
-      // like "%" when followed by a space or end of string (both sides
-      // non-word) — which is the overwhelmingly common shape ("312%
-      // growth", "312%" at a line's end), so the old \b-based regex
-      // missed most real percentage metrics entirely.
+      // Check for a numeric metric in the bullet — but don't decide yet
+      // whether it becomes the slide's statValue; that depends on how
+      // many *other* bullets this section turns out to have, which we
+      // don't know until the loop finishes (see the points.length === 1
+      // gate below). Only the first metric-shaped bullet is remembered,
+      // matching the old "first wins" behavior for the single-stat case.
+      // The trailing boundary is a negative lookahead rather than \b: \b
+      // only fires between a word and non-word character, so it never
+      // matches after a symbol unit like "%" when followed by a space or
+      // end of string (both sides non-word) — which is the overwhelmingly
+      // common shape ("312% growth", "312%" at a line's end), so a
+      // \b-based regex would miss most real percentage metrics entirely.
       const metricMatch = cleanPoint.match(/(\b\d+(?:\.\d+)?\s*(?:ms|%|x|k|M|B|GB|TB|TB\/s|fps)(?![a-zA-Z0-9])|\$\d+(?:\.\d+)?(?:M|B|K)?(?![a-zA-Z0-9]))/i);
-      if (metricMatch && !statValue) {
-        statValue = metricMatch[1];
-        const colonIdx = cleanPoint.indexOf(':');
-        if (colonIdx !== -1) {
-          // Strip the metric itself back out of the label half — a bullet
-          // like "312% Revenue Growth: driven by..." would otherwise
-          // produce statLabel "312% REVENUE GROWTH", repeating the exact
-          // value the big display number already shows right next to it.
-          const strippedLabel = cleanPoint
-            .substring(0, colonIdx)
-            .replace(statValue, '')
-            .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
-            .trim();
-          statLabel = (strippedLabel || 'KEY METRIC').toUpperCase();
-        } else {
-          statLabel = 'KEY METRIC';
-        }
+      if (metricMatch && !statCandidate) {
+        statCandidate = { point: cleanPoint, value: metricMatch[1] };
       }
       continue;
     }
@@ -288,6 +285,36 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
   }
 
   const body = bodyParagraphs.join(' ').trim();
+
+  // statValue/statLabel is reserved for a section whose ENTIRE point is
+  // one single number — never extracted from a section that naturally
+  // forms a parallel list of 2+ items, even when several of those items
+  // are individually numeric ("100 Gbps" / "20,000 m" / "365+ Days" is a
+  // 3-item metrics list, not one hero stat with two leftover items).
+  // Promoting the first numeric-looking bullet into statValue there would
+  // silently drop the other two: detectRegime() (composer.ts) picks the
+  // STAT regime over GRID whenever a stat is present at all, regardless
+  // of how many parallel points also exist, and composeStat() has no
+  // bullets slot to fall back on. See designSchoolGuidelines.ts's
+  // matching instruction for the LLM path.
+  if (points.length === 1 && statCandidate) {
+    statValue = statCandidate.value;
+    const colonIdx = statCandidate.point.indexOf(':');
+    if (colonIdx !== -1) {
+      // Strip the metric itself back out of the label half — a bullet
+      // like "312% Revenue Growth: driven by..." would otherwise
+      // produce statLabel "312% REVENUE GROWTH", repeating the exact
+      // value the big display number already shows right next to it.
+      const strippedLabel = statCandidate.point
+        .substring(0, colonIdx)
+        .replace(statValue, '')
+        .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
+        .trim();
+      statLabel = (strippedLabel || 'KEY METRIC').toUpperCase();
+    } else {
+      statLabel = 'KEY METRIC';
+    }
+  }
 
   return {
     heading,
