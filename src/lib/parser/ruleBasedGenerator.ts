@@ -117,17 +117,31 @@ export function generateDynamicSlidesFromText(
     }
 
     const sec = parseSectionContent(chunkText, slideNum);
+
+    // A chunk with its own captured quote+attribution is a quote slide
+    // (see designSchoolGuidelines.ts's Dijkstra example: headline IS the
+    // quote text, never a section title next to it) — the same pattern
+    // the LLM prompt is told to follow. Preferring sec.heading here
+    // unconditionally (the old behavior) meant a chunk like "### 05. A
+    // Perspective on Near-Space Infrastructure\n\"...\"\n— Author" used
+    // its own section title as headline and left the actual quote text
+    // to fall through to the coverage-check safety net as a confusingly-
+    // ordered body append. The section's own heading text still isn't
+    // discarded — it becomes the subheading/eyebrow instead, so it's
+    // still verbatim-verified, just in a field that fits it.
+    const isQuoteSection = Boolean(sec.quote && sec.author);
     // Same "no natural headline-length line -> reuse the chunk's own
     // first sentence" rule the LLM prompt asks the model to follow (see
     // designSchoolGuidelines.ts), applied here too so a chunk with no
     // markdown heading still gets a real, verbatim headline instead of a
     // fabricated one.
-    const headline = sec.heading || firstSentence(chunkText);
+    const headline = isQuoteSection ? (sec.quote as string) : sec.heading || firstSentence(chunkText);
+    const subheading = isQuoteSection ? sec.heading || undefined : sec.subheading;
     const iconName = sec.statValue ? 'zap' : sec.points.length >= 3 ? 'layers' : 'sparkles';
 
     const slide: AISlideItem = {
       headline,
-      subheading: sec.subheading,
+      subheading,
       body: sec.body,
       statValue: sec.statValue,
       statLabel: sec.statLabel,
@@ -254,6 +268,18 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
     // Quote detection
     if (line.startsWith('>') || line.startsWith('“') || line.startsWith('"')) {
       quote = stripMarkdownSyntax(line.replace(/^[>“"\s]+|[”"\s]+$/g, ''));
+      continue;
+    }
+
+    // Author attribution: an em-dash/hyphen prefix immediately following
+    // a quote already captured on an earlier line (e.g. "— Jane Doe"),
+    // mirroring the exact pattern the LLM prompt is told to recognize
+    // (see designSchoolGuidelines.ts's Dijkstra example: "— Edsger W.
+    // Dijkstra" -> author). Gated on `quote` already being set so a body
+    // paragraph that merely starts with a hyphen elsewhere in the deck is
+    // never misread as an attribution.
+    if (quote && !author && /^[—–-]\s*\S/.test(line)) {
+      author = stripMarkdownSyntax(line.replace(/^[—–-]\s*/, ''));
       continue;
     }
 

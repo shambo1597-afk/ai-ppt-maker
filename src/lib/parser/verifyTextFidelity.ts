@@ -36,9 +36,30 @@ import { stripMarkdownSyntax } from './markdownStrip';
  * reaches here, which can otherwise break substring containment for text
  * like "b**old** text" -> "bold text"); actually adding, removing, or
  * reordering a word will still fail it, since that changes the
- * surrounding substring match. */
+ * surrounding substring match.
+ *
+ * Also strips a *leading* quote/dash wrapper (`"`/`“`/`'`/`—`/`-`) and a
+ * *trailing* quote wrapper for comparison only, same reasoning: both
+ * generation paths deliberately drop these when they extract a quote
+ * ("The future..." -> headline: "The future...", no wrapping quote
+ * marks) or an author attribution ("— Jane Doe" -> author: "Jane Doe",
+ * no leading dash) — an established extraction convention, not content
+ * going missing. Without this, the coverage check in
+ * verifySlideTextFidelity() below would see the source clause's wrapping
+ * punctuation as "not found" in the field that correctly omitted it, and
+ * re-append the clause to body as a visible duplicate of what's already
+ * showing (correctly, unwrapped) in the headline/author field. Anchored
+ * to the start/end of the whole compared string, never mid-string, so a
+ * real hyphen or quote elsewhere in the text is untouched. */
 function normalize(s: string): string {
-  return s.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return s
+    .replace(/\*\*/g, '')
+    .trim()
+    .replace(/^[-–—"“”'‘’]+\s*/, '')
+    .replace(/\s*["“”'‘’]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 /** Is `candidate` a normalized substring of `source`? An empty/whitespace
@@ -133,6 +154,20 @@ export function verifySlideTextFidelity(chunkText: string, slide: AISlideItem): 
   );
 
   if (missingClauses.length > 0) {
+    // This is the last-resort safety net, not the normal path — it
+    // firing means the classifier (model or rule-based heuristic) left
+    // some of the chunk's own real content unclaimed by any field, most
+    // often because a chunk merged multiple sections' worth of text (see
+    // buildSlideChunks()'s overflow-merge) and the classifier could only
+    // pull one section's worth out of it. Logged so this is observable
+    // during testing instead of silently succeeding (content quietly
+    // ends up in body, out of its intended field) or, if this branch
+    // were ever skipped, silently failing (content vanishing with no
+    // trace at all).
+    console.warn(
+      `[verifySlideTextFidelity] Coverage safety net fired: ${missingClauses.length} clause(s) from the source chunk weren't claimed by any field and were appended to body verbatim: ` +
+        missingClauses.map((c) => `"${c}"`).join(' | ')
+    );
     const appendix = missingClauses.join(' ');
     result.body = result.body ? `${result.body} ${appendix}` : appendix;
   }
