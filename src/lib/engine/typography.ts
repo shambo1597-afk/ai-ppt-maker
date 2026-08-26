@@ -128,12 +128,53 @@ export interface AutoFitOptions extends TextMeasureFont {
  * per composition — a two-word headline renders near `maxSize`, a
  * three-line one shrinks until it fits. `opts`'s font fields must match
  * the eventual text element's own styling (see estimateTextHeight).
+ *
+ * This tolerates wrapping to multiple lines, as long as the total block
+ * still fits the height budget — correct for headline/body/bullet text,
+ * where wrapping is the normal, expected outcome. It is NOT correct for
+ * text that must never wrap at all (see autoFitSingleLineFontSize below).
  */
 export function autoFitFontSize(text: string, boxWidth: number, heightBudget: number, opts: AutoFitOptions): number {
   const { maxSize, minSize, lineHeightRatio = 1.1, step = 2, ...font } = opts;
   let size = maxSize;
   while (size > minSize) {
     if (estimateTextHeight(text, size, boxWidth, lineHeightRatio, font) <= heightBudget) {
+      return size;
+    }
+    size -= step;
+  }
+  return minSize;
+}
+
+export interface SingleLineFitOptions extends TextMeasureFont {
+  maxSize: number;
+  minSize: number;
+  step?: number;
+}
+
+/**
+ * Shrink a font size from `maxSize` down until `text` fits on a single
+ * unbroken line within `boxWidth` (floored at `minSize`) — never
+ * tolerates a wrap, unlike autoFitFontSize() above, which only bounds
+ * total rendered *height* and is perfectly happy to accept a wrap that
+ * still fits that height budget.
+ *
+ * Built for composer.ts's STAT regime hero number: `autoFitFontSize` was
+ * originally used there too, sized against a height budget alone — which
+ * only ever got exercised against short model-invented values like "68%"
+ * during development. A longer real value like "20,000 m" could still
+ * fit that height budget by wrapping onto two lines ("20" stacked over
+ * "000 m"), which is a fundamentally broken layout for a single hero
+ * number, not just an oversized one. Any text that must read as one
+ * line — a stat, a ticker value, a monospaced code/id string — should use
+ * this instead of autoFitFontSize().
+ */
+export function autoFitSingleLineFontSize(text: string, boxWidth: number, opts: SingleLineFitOptions): number {
+  const { maxSize, minSize, step = 2, ...font } = opts;
+  let size = maxSize;
+  while (size > minSize) {
+    const lineCount = countWrappedLinesExact(text, size, boxWidth, font) ?? countWrappedLinesApprox(text, size, boxWidth);
+    if (lineCount <= 1) {
       return size;
     }
     size -= step;
