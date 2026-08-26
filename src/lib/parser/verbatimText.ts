@@ -67,22 +67,41 @@ export function parsePinnedSlideText(input: string): ParsedPinnedText {
   return { pinned, unpinned: unpinnedLines.join('\n').trim() };
 }
 
+/** The result of splitting unpinned text into paragraph-level chunks —
+ * `isHeadingSplit` tells buildSlideChunks() whether these boundaries came
+ * from the user's own markdown heading structure (a real, authored
+ * section per chunk) or just from blank-line paragraph breaks / a
+ * sentence-group fallback (no natural section signal at all). That
+ * distinction is what decides whether the caller's slide-count budget is
+ * allowed to expand to fit every chunk, or should merge overflow the way
+ * it always has. */
+interface ParagraphSplitResult {
+  chunks: string[];
+  isHeadingSplit: boolean;
+}
+
 /** Split on blank lines (the strongest structural signal a plain-text
  * paste gives us) or markdown ##/### headings, mirroring
  * ruleBasedGenerator.ts's own splitTextIntoSections so unpinned text is
  * chunked the same familiar way whether or not any markers are present. */
-function splitIntoParagraphs(text: string): string[] {
-  if (!text.trim()) return [];
+function splitIntoParagraphs(text: string): ParagraphSplitResult {
+  if (!text.trim()) return { chunks: [], isHeadingSplit: false };
   if (/^##\s+/m.test(text) || /^###\s+/m.test(text)) {
-    return text
-      .split(/(?=^##?\s+|^###\s+)/m)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    return {
+      chunks: text
+        .split(/(?=^##?\s+|^###\s+)/m)
+        .map((s) => s.trim())
+        .filter(Boolean),
+      isHeadingSplit: true,
+    };
   }
-  return text
-    .split(/\n\s*\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return {
+    chunks: text
+      .split(/\n\s*\n/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+    isHeadingSplit: false,
+  };
 }
 
 /** Break one paragraph into roughly-equal sentence-level groups so a
@@ -129,20 +148,51 @@ export interface SlideChunkPlan {
  * Build the full slide-number -> source-text plan for a generation run:
  * pinned chunks keep their explicit slide numbers; unpinned text is split
  * into paragraph/sentence-level chunks and distributed, in order, across
- * whichever slide numbers aren't already claimed by a pin, capped at
- * `targetSlideCount` slots (excess paragraphs are merged — literally
- * concatenated, never reworded — into the last slot rather than dropped,
- * same as a pinned number is never dropped). Never invents connective
- * text between chunks — every chunk is a literal excerpt of the original
- * input.
+ * whichever slide numbers aren't already claimed by a pin. Never invents
+ * connective text between chunks — every chunk is a literal excerpt of
+ * the original input.
+ *
+ * `targetSlideCount` is either an explicit number — a real user request
+ * ("make this a 6-slide deck") — or the string `'auto'`, meaning nobody
+ * asked for a specific count at all. The two behave differently on
+ * purpose:
+ *
+ * - An explicit number always caps the unpinned slots at
+ *   `targetSlideCount - pinned.size`; excess paragraphs are merged —
+ *   literally concatenated, never reworded — into the last slot rather
+ *   than dropped, same as a pinned number is never dropped. This is the
+ *   user's own ask, so it wins even over the input's own heading
+ *   structure.
+ * - `'auto'` has no opinion of its own. When the unpinned text splits on
+ *   the user's own markdown heading structure (`splitIntoParagraphs`'s
+ *   `isHeadingSplit`), every natural section gets its own slide — no cap,
+ *   no merge — because a heading-structured input's own section count IS
+ *   the real target, not a hardcoded guess. Only when there's no heading
+ *   structure at all (plain prose, blank-line paragraphs or a single wall
+ *   of text) does 'auto' fall back to a reasonable default slot count —
+ *   there's no natural section boundary to expand to in that case either
+ *   way.
  */
-export function buildSlideChunks(input: string, targetSlideCount: number): SlideChunkPlan {
+export function buildSlideChunks(input: string, targetSlideCount: number | 'auto'): SlideChunkPlan {
   const { pinned, unpinned } = parsePinnedSlideText(input);
 
   const highestPinned = pinned.size > 0 ? Math.max(...pinned.keys()) : 0;
-  const availableSlots = Math.max(0, targetSlideCount - pinned.size);
+  const explicitCount = typeof targetSlideCount === 'number' ? targetSlideCount : undefined;
+  // Only reached by 'auto' input with no heading structure — matches the
+  // slot count this function always used before the 'auto'/explicit
+  // distinction existed, so plain-prose behavior is unchanged.
+  const AUTO_FALLBACK_COUNT = 6;
 
-  let unpinnedChunks = splitIntoParagraphs(unpinned);
+  const { chunks: paragraphChunks, isHeadingSplit } = splitIntoParagraphs(unpinned);
+  let unpinnedChunks = paragraphChunks;
+
+  const availableSlots =
+    explicitCount !== undefined
+      ? Math.max(0, explicitCount - pinned.size)
+      : isHeadingSplit
+      ? paragraphChunks.length
+      : Math.max(0, AUTO_FALLBACK_COUNT - pinned.size);
+
   if (unpinnedChunks.length <= 1 && unpinned.trim() && availableSlots > 1) {
     unpinnedChunks = splitIntoSentenceGroups(unpinned, availableSlots);
   } else if (unpinnedChunks.length === 0 && unpinned.trim()) {
@@ -152,7 +202,10 @@ export function buildSlideChunks(input: string, targetSlideCount: number): Slide
   // More unpinned chunks than slots for them? Merge the overflow into the
   // last slot (a literal concatenation) rather than truncating — dropping
   // a paragraph the user pasted would be exactly the kind of silent data
-  // loss this whole feature exists to prevent.
+  // loss this whole feature exists to prevent. For 'auto' + heading-split
+  // input this never triggers (availableSlots was sized to fit exactly),
+  // which is the actual Task 2 fix: a natural section no longer vanishes
+  // into an overflow merge just because nobody asked for a specific count.
   if (availableSlots > 0 && unpinnedChunks.length > availableSlots) {
     const head = unpinnedChunks.slice(0, availableSlots - 1);
     const overflow = unpinnedChunks.slice(availableSlots - 1).join('\n\n');

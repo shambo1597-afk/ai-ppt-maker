@@ -28,7 +28,13 @@ interface ParsedSection {
 export function generateDynamicSlidesFromText(
   rawText: string,
   uploadedAssets: AssetItem[] = [],
-  targetSlideCount: number = 6,
+  // 'auto' (nobody asked for a specific slide count — the code has no
+  // opinion of its own) is the default, not a hardcoded 6. That
+  // distinction matters: buildSlideChunks() lets a heading-structured
+  // input's own natural section count win under 'auto', but a genuine
+  // explicit number (the UI's own 5/7/10/custom slide-count picker)
+  // still caps/merges as before. See verbatimText.ts's buildSlideChunks().
+  targetSlideCount: number | 'auto' = 'auto',
   deckSeed: number = newDeckSeed()
 ): AIPresentationResponse {
   const text = rawText.trim();

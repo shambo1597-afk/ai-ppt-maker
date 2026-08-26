@@ -47,7 +47,17 @@ export async function generatePresentation(
   deckSeed: number = newDeckSeed()
 ): Promise<AIPresentationResponse> {
   const apiKey = resolveGeminiApiKey();
-  const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
+  // 'auto' (the UI's default — nobody explicitly picked a slide count) is
+  // preserved as 'auto' all the way down to buildSlideChunks(), rather
+  // than being collapsed into a plain number here. That distinction is
+  // the actual Task 2 fix: collapsing it here made "nobody asked" and
+  // "the user explicitly asked for 6" indistinguishable by the time
+  // buildSlideChunks() ran, so a heading-structured brief with more than
+  // 6 sections silently lost its excess sections into a merged overflow
+  // chunk even though no one ever asked for exactly 6 slides. An actual
+  // explicit number (the UI's 5/7/10/custom picker) still passes through
+  // unchanged and still caps/merges as before.
+  const targetCount: number | 'auto' = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 'auto';
 
   // TODO(product): userContent is always treated as the deck's own
   // verbatim source text to classify into slides (see
@@ -177,7 +187,11 @@ export async function generatePresentationWithGemini(
     const data = await generatePresentation(assignmentText, assets, slideCount);
     return { data, fallbackNotice: hadApiKey ? undefined : 'No Gemini API key configured — used the local design engine.' };
   } catch (err) {
-    const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
+    // Same 'auto'-vs-explicit distinction as generatePresentation() above
+    // — collapsing 'auto' into a hardcoded 6 here would silently truncate
+    // a heading-structured brief's natural section count on this fallback
+    // path too.
+    const targetCount: number | 'auto' = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 'auto';
     const fallback = generateDynamicSlidesFromText(assignmentText, assets, targetCount);
     return {
       data: fallback,
