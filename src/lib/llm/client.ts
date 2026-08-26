@@ -8,6 +8,7 @@ import { applyRhythmToAISlides } from '../engine/rhythm';
 import { seededRandom, newDeckSeed } from '../utils/prng';
 import { buildSlideChunks } from '../parser/verbatimText';
 import { verifySlideTextFidelity } from '../parser/verifyTextFidelity';
+import { stripMarkdownSyntax } from '../parser/markdownStrip';
 
 export const SYSTEM_PROMPT = getDesignSchoolSystemPrompt();
 
@@ -75,6 +76,18 @@ export async function generatePresentation(
   // chunk's own text into fields; it never sees this as "a brief to
   // write from".
   const { chunks, slideCount: neededSlideCount, hasPinnedMarkers } = buildSlideChunks(userContent, targetCount);
+
+  // Markdown syntax (#, **, -, ---, > ...) is structural formatting the
+  // user's authoring tool added, not literal words they wrote (see
+  // verifyTextFidelity.ts's class comment). Strip it once, here, so the
+  // model classifies clean prose instead of raw markdown it then has to
+  // remember to strip itself — verifySlideTextFidelity() also strips
+  // internally, so this is belt-and-suspenders, not load-bearing, but it
+  // keeps what the model actually sees free of syntax noise in the first
+  // place.
+  for (const [slideNum, chunkText] of chunks) {
+    chunks.set(slideNum, stripMarkdownSyntax(chunkText));
+  }
 
   // Construct Asset Manifest & Slide Count Directives
   let assetDirective = '';

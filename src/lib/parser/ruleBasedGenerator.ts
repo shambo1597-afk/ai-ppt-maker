@@ -5,6 +5,7 @@ import { newDeckSeed, seededRandom } from '../utils/prng';
 import { generateTheme, hueHintForMood, inferGravity } from '../design/themeGenerator';
 import { buildSlideChunks } from './verbatimText';
 import { verifySlideTextFidelity } from './verifyTextFidelity';
+import { stripMarkdownSyntax, isHorizontalRuleLine } from './markdownStrip';
 
 interface ParsedSection {
   heading: string;
@@ -83,6 +84,17 @@ export function generateDynamicSlidesFromText(
   // stripped by verifySlideTextFidelity() below exactly like the LLM
   // path's invented text would be, so "verbatim-always" applies uniformly
   // to both generation paths.
+  // NOTE: unlike client.ts's LLM path, chunks here are deliberately NOT
+  // pre-stripped of markdown syntax before parseSectionContent() runs —
+  // this heuristic (unlike an LLM) detects structure (heading/bullet/
+  // quote) by literally matching marker characters (`#`, `- `, `1. `,
+  // `>`) at the start of each line; stripping them upstream would blind
+  // it to that structure entirely (verified: it collapses every chunk
+  // into one undifferentiated body paragraph, losing points/headings).
+  // Every field parseSectionContent() extracts is still run through
+  // stripMarkdownSyntax() itself, below, before it's returned — so the
+  // *output* is exactly as clean as the LLM path's, just reached by
+  // stripping after structural classification instead of before it.
   const { chunks, slideCount, hasPinnedMarkers } = buildSlideChunks(text, targetSlideCount);
 
   // 4. Build one slide per claimed slide number, each parsed from (and
@@ -178,15 +190,30 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Heading Match
+    // Standalone horizontal rule (---/***/___) — structural markup the
+    // user's authoring tool inserted between sections, never a word they
+    // wrote (see markdownStrip.ts / verifyTextFidelity.ts's class
+    // comment). Drop it outright, same as it would be dropped if this
+    // chunk went through stripMarkdownSyntax() wholesale — otherwise it
+    // falls through to the body-paragraph bucket below and renders as a
+    // literal "---" on the slide.
+    if (isHorizontalRuleLine(line)) {
+      continue;
+    }
+
+    // Heading Match — detected on the raw, marker-intact line (this
+    // heuristic, unlike an LLM, can only recognize structure by literal
+    // marker characters), but the extracted text itself is run through
+    // stripMarkdownSyntax() below so the field this function returns is
+    // exactly as clean as the LLM path's.
     if (line.startsWith('#') && !heading) {
-      heading = line.replace(/^[#]+\s*/, '').trim();
+      heading = stripMarkdownSyntax(line);
       continue;
     }
 
     // Numbered or Bulleted list item
     if (/^[•*-]\s+/.test(line) || /^[0-9]+[.)]\s+/.test(line)) {
-      const cleanPoint = line.replace(/^[•*-0-9.)]+\s*/, '').replace(/\*\*/g, '').trim();
+      const cleanPoint = stripMarkdownSyntax(line);
       points.push(cleanPoint);
 
       // Check for numeric metrics in the bullet. The trailing boundary is
@@ -220,12 +247,12 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
 
     // Quote detection
     if (line.startsWith('>') || line.startsWith('“') || line.startsWith('"')) {
-      quote = line.replace(/^[>“"\s]+|[”"\s]+$/g, '').trim();
+      quote = stripMarkdownSyntax(line.replace(/^[>“"\s]+|[”"\s]+$/g, ''));
       continue;
     }
 
     // Body paragraph
-    bodyParagraphs.push(line.replace(/\*\*/g, ''));
+    bodyParagraphs.push(stripMarkdownSyntax(line));
   }
 
   const body = bodyParagraphs.join(' ').trim();

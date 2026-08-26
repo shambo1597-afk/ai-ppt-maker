@@ -8,8 +8,25 @@
  * isn't a real substring of the chunk it was supposedly extracted from
  * gets dropped, not silently kept: better to under-render than to show
  * invented copy.
+ *
+ * Markdown-vs-content interpretation: the "nothing more, nothing less"
+ * verbatim guarantee applies to the user's actual *words*, not to the
+ * markup characters their authoring tool wrapped them in. A `#` heading
+ * marker or `**` emphasis pair is formatting describing the user's
+ * intended structure — it was never a word they wrote — so every
+ * comparison in this file runs against `chunkText` with that markdown
+ * syntax stripped (see markdownStrip.ts), never against the raw
+ * markdown-laden source. Without this, a model that (correctly) returns
+ * a clean headline with the `##` removed would fail the substring check
+ * against the still-raw source, "fail" coverage, and have the entire raw
+ * chunk — `#`/`**`/`---` included — appended to the slide as a visible
+ * duplicate. This is a deliberate interpretation decision, not an
+ * implementation detail: it means a field can never be flagged as
+ * fabricated purely because the model stripped syntax it was correctly
+ * asked to strip.
  */
 import { AISlideItem } from '../../types/llm';
+import { stripMarkdownSyntax } from './markdownStrip';
 
 /** Collapse whitespace, lowercase, and drop markdown bold markers (`**`)
  * for comparison only — never for the output. A model reformatting line
@@ -60,12 +77,20 @@ export interface DroppedField {
  * the user wrote silently vanishes.
  */
 export function verifySlideTextFidelity(chunkText: string, slide: AISlideItem): AISlideItem {
+  // Strip once, here, and compare everything below against this cleaned
+  // text — never the raw markdown-laden original (see the class comment
+  // above). Idempotent if the chunk already arrived pre-stripped (see
+  // client.ts/ruleBasedGenerator.ts, which strip before the model/
+  // heuristic ever sees a chunk), so it's always safe to strip again here
+  // as the single source of truth this function actually verifies against.
+  const cleanChunkText = stripMarkdownSyntax(chunkText);
+
   const result: AISlideItem = { ...slide };
   const dropped: DroppedField[] = [];
 
   for (const key of TEXT_FIELD_KEYS) {
     const value = result[key as TextFieldKey] as string | undefined;
-    if (typeof value === 'string' && value && !isVerbatimSubstring(value, chunkText)) {
+    if (typeof value === 'string' && value && !isVerbatimSubstring(value, cleanChunkText)) {
       dropped.push({ field: key, value });
       (result as any)[key] = undefined;
     }
@@ -74,7 +99,7 @@ export function verifySlideTextFidelity(chunkText: string, slide: AISlideItem): 
   if (Array.isArray(result.points)) {
     const keptPoints: string[] = [];
     result.points.forEach((point, idx) => {
-      if (typeof point === 'string' && isVerbatimSubstring(point, chunkText)) {
+      if (typeof point === 'string' && isVerbatimSubstring(point, cleanChunkText)) {
         keptPoints.push(point);
       } else {
         dropped.push({ field: `points[${idx}]`, value: String(point) });
@@ -103,7 +128,7 @@ export function verifySlideTextFidelity(chunkText: string, slide: AISlideItem): 
     result.author,
   ].filter((v): v is string => typeof v === 'string' && v.length > 0);
 
-  const missingClauses = splitIntoClauses(chunkText).filter(
+  const missingClauses = splitIntoClauses(cleanChunkText).filter(
     (clause) => !survivingFields.some((field) => isVerbatimSubstring(clause, field))
   );
 
