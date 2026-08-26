@@ -8,6 +8,7 @@ import { applyRhythmToAISlides } from '../engine/rhythm';
 import { seededRandom, newDeckSeed } from '../utils/prng';
 import { buildSlideChunks } from '../parser/verbatimText';
 import { verifySlideTextFidelity } from '../parser/verifyTextFidelity';
+import { stripMarkdownSyntax } from '../parser/markdownStrip';
 
 export const SYSTEM_PROMPT = getDesignSchoolSystemPrompt();
 
@@ -46,7 +47,17 @@ export async function generatePresentation(
   deckSeed: number = newDeckSeed()
 ): Promise<AIPresentationResponse> {
   const apiKey = resolveGeminiApiKey();
-  const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
+  // 'auto' (the UI's default — nobody explicitly picked a slide count) is
+  // preserved as 'auto' all the way down to buildSlideChunks(), rather
+  // than being collapsed into a plain number here. That distinction is
+  // the actual Task 2 fix: collapsing it here made "nobody asked" and
+  // "the user explicitly asked for 6" indistinguishable by the time
+  // buildSlideChunks() ran, so a heading-structured brief with more than
+  // 6 sections silently lost its excess sections into a merged overflow
+  // chunk even though no one ever asked for exactly 6 slides. An actual
+  // explicit number (the UI's 5/7/10/custom picker) still passes through
+  // unchanged and still caps/merges as before.
+  const targetCount: number | 'auto' = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 'auto';
 
   // TODO(product): userContent is always treated as the deck's own
   // verbatim source text to classify into slides (see
@@ -75,6 +86,18 @@ export async function generatePresentation(
   // chunk's own text into fields; it never sees this as "a brief to
   // write from".
   const { chunks, slideCount: neededSlideCount, hasPinnedMarkers } = buildSlideChunks(userContent, targetCount);
+
+  // Markdown syntax (#, **, -, ---, > ...) is structural formatting the
+  // user's authoring tool added, not literal words they wrote (see
+  // verifyTextFidelity.ts's class comment). Strip it once, here, so the
+  // model classifies clean prose instead of raw markdown it then has to
+  // remember to strip itself — verifySlideTextFidelity() also strips
+  // internally, so this is belt-and-suspenders, not load-bearing, but it
+  // keeps what the model actually sees free of syntax noise in the first
+  // place.
+  for (const [slideNum, chunkText] of chunks) {
+    chunks.set(slideNum, stripMarkdownSyntax(chunkText));
+  }
 
   // Construct Asset Manifest & Slide Count Directives
   let assetDirective = '';
@@ -164,7 +187,11 @@ export async function generatePresentationWithGemini(
     const data = await generatePresentation(assignmentText, assets, slideCount);
     return { data, fallbackNotice: hadApiKey ? undefined : 'No Gemini API key configured — used the local design engine.' };
   } catch (err) {
-    const targetCount = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 6;
+    // Same 'auto'-vs-explicit distinction as generatePresentation() above
+    // — collapsing 'auto' into a hardcoded 6 here would silently truncate
+    // a heading-structured brief's natural section count on this fallback
+    // path too.
+    const targetCount: number | 'auto' = typeof slideCount === 'number' && slideCount > 0 ? slideCount : 'auto';
     const fallback = generateDynamicSlidesFromText(assignmentText, assets, targetCount);
     return {
       data: fallback,

@@ -5,6 +5,7 @@ import { newDeckSeed, seededRandom } from '../utils/prng';
 import { generateTheme, hueHintForMood, inferGravity } from '../design/themeGenerator';
 import { buildSlideChunks } from './verbatimText';
 import { verifySlideTextFidelity } from './verifyTextFidelity';
+import { stripMarkdownSyntax, isHorizontalRuleLine } from './markdownStrip';
 
 interface ParsedSection {
   heading: string;
@@ -27,7 +28,13 @@ interface ParsedSection {
 export function generateDynamicSlidesFromText(
   rawText: string,
   uploadedAssets: AssetItem[] = [],
-  targetSlideCount: number = 6,
+  // 'auto' (nobody asked for a specific slide count — the code has no
+  // opinion of its own) is the default, not a hardcoded 6. That
+  // distinction matters: buildSlideChunks() lets a heading-structured
+  // input's own natural section count win under 'auto', but a genuine
+  // explicit number (the UI's own 5/7/10/custom slide-count picker)
+  // still caps/merges as before. See verbatimText.ts's buildSlideChunks().
+  targetSlideCount: number | 'auto' = 'auto',
   deckSeed: number = newDeckSeed()
 ): AIPresentationResponse {
   const text = rawText.trim();
@@ -83,6 +90,17 @@ export function generateDynamicSlidesFromText(
   // stripped by verifySlideTextFidelity() below exactly like the LLM
   // path's invented text would be, so "verbatim-always" applies uniformly
   // to both generation paths.
+  // NOTE: unlike client.ts's LLM path, chunks here are deliberately NOT
+  // pre-stripped of markdown syntax before parseSectionContent() runs —
+  // this heuristic (unlike an LLM) detects structure (heading/bullet/
+  // quote) by literally matching marker characters (`#`, `- `, `1. `,
+  // `>`) at the start of each line; stripping them upstream would blind
+  // it to that structure entirely (verified: it collapses every chunk
+  // into one undifferentiated body paragraph, losing points/headings).
+  // Every field parseSectionContent() extracts is still run through
+  // stripMarkdownSyntax() itself, below, before it's returned — so the
+  // *output* is exactly as clean as the LLM path's, just reached by
+  // stripping after structural classification instead of before it.
   const { chunks, slideCount, hasPinnedMarkers } = buildSlideChunks(text, targetSlideCount);
 
   // 4. Build one slide per claimed slide number, each parsed from (and
@@ -99,17 +117,31 @@ export function generateDynamicSlidesFromText(
     }
 
     const sec = parseSectionContent(chunkText, slideNum);
+
+    // A chunk with its own captured quote+attribution is a quote slide
+    // (see designSchoolGuidelines.ts's Dijkstra example: headline IS the
+    // quote text, never a section title next to it) — the same pattern
+    // the LLM prompt is told to follow. Preferring sec.heading here
+    // unconditionally (the old behavior) meant a chunk like "### 05. A
+    // Perspective on Near-Space Infrastructure\n\"...\"\n— Author" used
+    // its own section title as headline and left the actual quote text
+    // to fall through to the coverage-check safety net as a confusingly-
+    // ordered body append. The section's own heading text still isn't
+    // discarded — it becomes the subheading/eyebrow instead, so it's
+    // still verbatim-verified, just in a field that fits it.
+    const isQuoteSection = Boolean(sec.quote && sec.author);
     // Same "no natural headline-length line -> reuse the chunk's own
     // first sentence" rule the LLM prompt asks the model to follow (see
     // designSchoolGuidelines.ts), applied here too so a chunk with no
     // markdown heading still gets a real, verbatim headline instead of a
     // fabricated one.
-    const headline = sec.heading || firstSentence(chunkText);
+    const headline = isQuoteSection ? (sec.quote as string) : sec.heading || firstSentence(chunkText);
+    const subheading = isQuoteSection ? sec.heading || undefined : sec.subheading;
     const iconName = sec.statValue ? 'zap' : sec.points.length >= 3 ? 'layers' : 'sparkles';
 
     const slide: AISlideItem = {
       headline,
-      subheading: sec.subheading,
+      subheading,
       body: sec.body,
       statValue: sec.statValue,
       statLabel: sec.statLabel,
@@ -174,61 +206,115 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
   let statLabel: string | undefined;
   let quote: string | undefined;
   let author: string | undefined;
+  // The first metric-shaped bullet found, if any — only promoted to an
+  // actual statValue/statLabel after the loop, once we know whether this
+  // section turned out to have exactly one point (a real hero metric) or
+  // several (a parallel metrics list — see the points.length === 1 gate
+  // below, and designSchoolGuidelines.ts's matching instruction for the
+  // LLM path).
+  let statCandidate: { point: string; value: string } | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Heading Match
+    // Standalone horizontal rule (---/***/___) — structural markup the
+    // user's authoring tool inserted between sections, never a word they
+    // wrote (see markdownStrip.ts / verifyTextFidelity.ts's class
+    // comment). Drop it outright, same as it would be dropped if this
+    // chunk went through stripMarkdownSyntax() wholesale — otherwise it
+    // falls through to the body-paragraph bucket below and renders as a
+    // literal "---" on the slide.
+    if (isHorizontalRuleLine(line)) {
+      continue;
+    }
+
+    // Heading Match — detected on the raw, marker-intact line (this
+    // heuristic, unlike an LLM, can only recognize structure by literal
+    // marker characters), but the extracted text itself is run through
+    // stripMarkdownSyntax() below so the field this function returns is
+    // exactly as clean as the LLM path's.
     if (line.startsWith('#') && !heading) {
-      heading = line.replace(/^[#]+\s*/, '').trim();
+      heading = stripMarkdownSyntax(line);
       continue;
     }
 
     // Numbered or Bulleted list item
     if (/^[•*-]\s+/.test(line) || /^[0-9]+[.)]\s+/.test(line)) {
-      const cleanPoint = line.replace(/^[•*-0-9.)]+\s*/, '').replace(/\*\*/g, '').trim();
+      const cleanPoint = stripMarkdownSyntax(line);
       points.push(cleanPoint);
 
-      // Check for numeric metrics in the bullet. The trailing boundary is
-      // a negative lookahead rather than \b: \b only fires between a word
-      // and non-word character, so it never matches after a symbol unit
-      // like "%" when followed by a space or end of string (both sides
-      // non-word) — which is the overwhelmingly common shape ("312%
-      // growth", "312%" at a line's end), so the old \b-based regex
-      // missed most real percentage metrics entirely.
+      // Check for a numeric metric in the bullet — but don't decide yet
+      // whether it becomes the slide's statValue; that depends on how
+      // many *other* bullets this section turns out to have, which we
+      // don't know until the loop finishes (see the points.length === 1
+      // gate below). Only the first metric-shaped bullet is remembered,
+      // matching the old "first wins" behavior for the single-stat case.
+      // The trailing boundary is a negative lookahead rather than \b: \b
+      // only fires between a word and non-word character, so it never
+      // matches after a symbol unit like "%" when followed by a space or
+      // end of string (both sides non-word) — which is the overwhelmingly
+      // common shape ("312% growth", "312%" at a line's end), so a
+      // \b-based regex would miss most real percentage metrics entirely.
       const metricMatch = cleanPoint.match(/(\b\d+(?:\.\d+)?\s*(?:ms|%|x|k|M|B|GB|TB|TB\/s|fps)(?![a-zA-Z0-9])|\$\d+(?:\.\d+)?(?:M|B|K)?(?![a-zA-Z0-9]))/i);
-      if (metricMatch && !statValue) {
-        statValue = metricMatch[1];
-        const colonIdx = cleanPoint.indexOf(':');
-        if (colonIdx !== -1) {
-          // Strip the metric itself back out of the label half — a bullet
-          // like "312% Revenue Growth: driven by..." would otherwise
-          // produce statLabel "312% REVENUE GROWTH", repeating the exact
-          // value the big display number already shows right next to it.
-          const strippedLabel = cleanPoint
-            .substring(0, colonIdx)
-            .replace(statValue, '')
-            .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
-            .trim();
-          statLabel = (strippedLabel || 'KEY METRIC').toUpperCase();
-        } else {
-          statLabel = 'KEY METRIC';
-        }
+      if (metricMatch && !statCandidate) {
+        statCandidate = { point: cleanPoint, value: metricMatch[1] };
       }
       continue;
     }
 
     // Quote detection
     if (line.startsWith('>') || line.startsWith('“') || line.startsWith('"')) {
-      quote = line.replace(/^[>“"\s]+|[”"\s]+$/g, '').trim();
+      quote = stripMarkdownSyntax(line.replace(/^[>“"\s]+|[”"\s]+$/g, ''));
+      continue;
+    }
+
+    // Author attribution: an em-dash/hyphen prefix immediately following
+    // a quote already captured on an earlier line (e.g. "— Jane Doe"),
+    // mirroring the exact pattern the LLM prompt is told to recognize
+    // (see designSchoolGuidelines.ts's Dijkstra example: "— Edsger W.
+    // Dijkstra" -> author). Gated on `quote` already being set so a body
+    // paragraph that merely starts with a hyphen elsewhere in the deck is
+    // never misread as an attribution.
+    if (quote && !author && /^[—–-]\s*\S/.test(line)) {
+      author = stripMarkdownSyntax(line.replace(/^[—–-]\s*/, ''));
       continue;
     }
 
     // Body paragraph
-    bodyParagraphs.push(line.replace(/\*\*/g, ''));
+    bodyParagraphs.push(stripMarkdownSyntax(line));
   }
 
   const body = bodyParagraphs.join(' ').trim();
+
+  // statValue/statLabel is reserved for a section whose ENTIRE point is
+  // one single number — never extracted from a section that naturally
+  // forms a parallel list of 2+ items, even when several of those items
+  // are individually numeric ("100 Gbps" / "20,000 m" / "365+ Days" is a
+  // 3-item metrics list, not one hero stat with two leftover items).
+  // Promoting the first numeric-looking bullet into statValue there would
+  // silently drop the other two: detectRegime() (composer.ts) picks the
+  // STAT regime over GRID whenever a stat is present at all, regardless
+  // of how many parallel points also exist, and composeStat() has no
+  // bullets slot to fall back on. See designSchoolGuidelines.ts's
+  // matching instruction for the LLM path.
+  if (points.length === 1 && statCandidate) {
+    statValue = statCandidate.value;
+    const colonIdx = statCandidate.point.indexOf(':');
+    if (colonIdx !== -1) {
+      // Strip the metric itself back out of the label half — a bullet
+      // like "312% Revenue Growth: driven by..." would otherwise
+      // produce statLabel "312% REVENUE GROWTH", repeating the exact
+      // value the big display number already shows right next to it.
+      const strippedLabel = statCandidate.point
+        .substring(0, colonIdx)
+        .replace(statValue, '')
+        .replace(/^[\s,;-]+|[\s,;-]+$/g, '')
+        .trim();
+      statLabel = (strippedLabel || 'KEY METRIC').toUpperCase();
+    } else {
+      statLabel = 'KEY METRIC';
+    }
+  }
 
   return {
     heading,

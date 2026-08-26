@@ -3,7 +3,7 @@ import { ThemeTokens } from '../design/tokens';
 import { mixHex } from '../design/colorMath';
 import { SlideContent, SlideBullet } from './contentModel';
 import { Box, CANVAS_H, getContentBox, stackGap, columnGutter, splitBox, computeGrid } from './grid';
-import { autoFitFontSize, baseTitleSize, baseBodySize, estimateTextHeight } from './typography';
+import { autoFitFontSize, autoFitSingleLineFontSize, baseTitleSize, baseBodySize, estimateTextHeight } from './typography';
 import { generatePosterGraphic, generateAmbientBlobs, PosterPalette } from './poster';
 
 /**
@@ -606,10 +606,17 @@ function composeStat(content: SlideContent, box: Box, surface: Surface): SlideEl
 
   const statValue = content.stat!.value;
   const statFont = { fontFamily: surface.fontHeading, fontWeight: surface.displayFontWeight, letterSpacing: surface.displayFontWeight === '300' ? 0 : -3 };
-  const statSize = autoFitFontSize(statValue, leftBox.width, Math.round(leftBox.height * 0.42), {
+  // A hero stat number must always render as one unbroken line — never
+  // wrapped — regardless of how long the real value turns out to be
+  // ("68%" and "20,000 m" and "$4.2M ARR" are all real statValue shapes,
+  // not just the short model-invented ones this was originally tuned
+  // against). autoFitFontSize() only bounds total rendered height, so a
+  // longer value could still "fit" by wrapping onto two lines — visibly
+  // broken for a single hero number. autoFitSingleLineFontSize() instead
+  // shrinks until the whole string fits the box width on one line.
+  const statSize = autoFitSingleLineFontSize(statValue, leftBox.width, {
     maxSize: Math.round(baseTitleSize() * 2.2),
     minSize: Math.round(baseTitleSize() * 1.1),
-    lineHeightRatio: 0.95,
     ...statFont,
   });
   const statY = leftBox.y + Math.round(baseBodySize() * 2.3);

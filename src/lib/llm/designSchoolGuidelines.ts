@@ -58,10 +58,17 @@ HARD RULES, no exceptions:
   at the user's own boundaries (line breaks, existing bullet markers,
   semicolons), never invent a title prefix like "Phase 1 Title:" that wasn't
   literally written in the chunk.
-- "statValue" / "statLabel": use ONLY when the chunk's own text contains one
-  standout metric (e.g. a literal "68%" or "$4.2M" in the source). statLabel
-  must itself be an excerpt from the chunk describing that metric — never a
-  category you invent, and never the number itself repeated.
+- "statValue" / "statLabel": use ONLY when the chunk's own ENTIRE point is one
+  single standout metric (e.g. a literal "68%" or "$4.2M" in the source).
+  statLabel must itself be an excerpt from the chunk describing that metric —
+  never a category you invent, and never the number itself repeated. If the
+  chunk instead contains two or more parallel "label: detail" or
+  "value: description" items — even when some of those values look numeric
+  (e.g. "100 Gbps: ...", "20,000 m: ...", "365+ Days: ..." as three separate
+  list items) — that is a metrics LIST, not one hero stat: classify the whole
+  set as "points" instead. Never split a parallel list between one
+  statValue/statLabel and a leftover dump of the others — a slide can only
+  show one statValue, so anything else in the chunk would be silently lost.
 - "author": set this only when the chunk's own text already names an
   attribution for a quotation within it (e.g. the chunk literally contains
   "— Jane Doe" or "said John Smith").
