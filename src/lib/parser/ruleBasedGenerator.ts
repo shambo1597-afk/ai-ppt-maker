@@ -238,6 +238,23 @@ function parseSectionContent(sectionText: string, index: number): ParsedSection 
       continue;
     }
 
+    // A genuine H2 subtitle line immediately following this chunk's own
+    // H1 — see verbatimText.ts's mergeCoverTitleAndSubtitle(), which
+    // merges exactly the "# Title\n## Subtitle" cover-slide pattern
+    // into one chunk so the H1 becomes headline and the H2 becomes
+    // subheading on a single slide, instead of two separate slides.
+    // Without this, the H2 line would fall through to the generic
+    // body-paragraph bucket below (its own `#`-check above only fires
+    // once per chunk, on the FIRST heading line). Gated on i === 1 (the
+    // line immediately after the H1) — mergeCoverTitleAndSubtitle()
+    // only ever merges when there's nothing but the H1 line before the
+    // H2, so the subtitle is always at this exact position within a
+    // merged chunk.
+    if (i === 1 && heading && /^##\s+/.test(line)) {
+      subheading = stripMarkdownSyntax(line);
+      continue;
+    }
+
     // Numbered or Bulleted list item
     if (/^[•*-]\s+/.test(line) || /^[0-9]+[.)]\s+/.test(line)) {
       const cleanPoint = stripMarkdownSyntax(line);

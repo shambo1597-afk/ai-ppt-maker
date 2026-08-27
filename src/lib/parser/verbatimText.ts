@@ -80,18 +80,53 @@ interface ParagraphSplitResult {
   isHeadingSplit: boolean;
 }
 
+/** Merge chunks[0] and chunks[1] into one cover-slide chunk when — and
+ * only when — chunks[0] is exactly an H1 heading line with nothing but
+ * whitespace after it (no body paragraph), and chunks[1] is exactly an
+ * H2 heading line (never H3 — `/^##\s+/` already can't match a `###`
+ * line, since the character right after the two literal `#`s would have
+ * to be whitespace, not a third `#`). Every other shape — no second
+ * chunk at all, an H1 followed by real body prose before the next
+ * heading, a second chunk that's H3+ — is returned completely
+ * untouched. The two heading LINES are joined on their own; each
+ * chunk's own trailing content (already trimmed by the caller) is
+ * otherwise preserved verbatim. */
+function mergeCoverTitleAndSubtitle(chunks: string[]): string[] {
+  if (chunks.length < 2) return chunks;
+
+  const [first, second, ...rest] = chunks;
+  if (!/^#\s+/.test(first) || !/^##\s+/.test(second)) return chunks;
+
+  const firstLines = first.split('\n');
+  const afterTitleLine = firstLines.slice(1).join('\n').trim();
+  if (afterTitleLine !== '') return chunks;
+
+  return [`${firstLines[0].trim()}\n${second}`, ...rest];
+}
+
 /** Split on blank lines (the strongest structural signal a plain-text
  * paste gives us) or markdown ##/### headings, mirroring
  * ruleBasedGenerator.ts's own splitTextIntoSections so unpinned text is
- * chunked the same familiar way whether or not any markers are present. */
+ * chunked the same familiar way whether or not any markers are present.
+ *
+ * Deliberate exception to the otherwise-uniform "one heading = one
+ * slide" rule: an H1 deck title immediately followed by an H2 one-line
+ * subtitle/framing (no body paragraph between them — a very common
+ * authoring pattern: "# Deck Title" then "## One-line subtitle" with
+ * nothing else) is merged into a single cover-slide chunk via
+ * mergeCoverTitleAndSubtitle() below, rather than becoming two separate
+ * full slides. This only ever touches the first two chunks; a `##` used
+ * as a genuine section divider anywhere else in the document — or one
+ * that follows real body prose under the H1 — is left completely alone. */
 function splitIntoParagraphs(text: string): ParagraphSplitResult {
   if (!text.trim()) return { chunks: [], isHeadingSplit: false };
   if (/^##\s+/m.test(text) || /^###\s+/m.test(text)) {
+    const chunks = text
+      .split(/(?=^##?\s+|^###\s+)/m)
+      .map((s) => s.trim())
+      .filter(Boolean);
     return {
-      chunks: text
-        .split(/(?=^##?\s+|^###\s+)/m)
-        .map((s) => s.trim())
-        .filter(Boolean),
+      chunks: mergeCoverTitleAndSubtitle(chunks),
       isHeadingSplit: true,
     };
   }
