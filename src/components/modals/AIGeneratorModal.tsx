@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSlideStore } from '../../store/useSlideStore';
 import { llmService } from '../../services/llmService';
+import { resolvePexelsApiKey, savePexelsApiKey } from '../../lib/assets/stockPhotoFetcher';
 import { LLMProvider } from '../../types/llm';
 import {
   X,
@@ -10,6 +11,7 @@ import {
   ShieldCheck,
   Zap,
   ExternalLink,
+  Image,
 } from 'lucide-react';
 
 export const AIGeneratorModal: React.FC = () => {
@@ -17,6 +19,7 @@ export const AIGeneratorModal: React.FC = () => {
 
   const [provider, setProvider] = useState<LLMProvider>('gemini');
   const [geminiKey, setGeminiKey] = useState('');
+  const [pexelsKey, setPexelsKey] = useState('');
   const [keysSaved, setKeysSaved] = useState(false);
 
   useEffect(() => {
@@ -24,6 +27,7 @@ export const AIGeneratorModal: React.FC = () => {
       const cfg = llmService.getConfig();
       setProvider(cfg.provider || 'gemini');
       setGeminiKey(cfg.geminiKey || '');
+      setPexelsKey(resolvePexelsApiKey());
       setKeysSaved(false);
     }
   }, [isAIGeneratorOpen]);
@@ -35,6 +39,7 @@ export const AIGeneratorModal: React.FC = () => {
       provider,
       geminiKey,
     });
+    savePexelsApiKey(pexelsKey);
     setKeysSaved(true);
     setTimeout(() => {
       setKeysSaved(false);
@@ -142,6 +147,38 @@ export const AIGeneratorModal: React.FC = () => {
               </p>
             </div>
           )}
+
+          {/* Pexels API Key — independent of LLM provider: the treated
+              stock-photo pipeline (see stockPhotoFetcher.ts) is an
+              optional, always-available feature regardless of which
+              engine generates the deck's text. */}
+          <div className="space-y-2 pt-1 border-t border-editor-border">
+            <div className="flex items-center justify-between pt-3">
+              <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Image size={14} className="text-sky-400" />
+                <span>Pexels API Key (optional)</span>
+              </label>
+              <a
+                href="https://www.pexels.com/api/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1"
+              >
+                <span>Get Free Key</span>
+                <ExternalLink size={11} />
+              </a>
+            </div>
+            <input
+              type="password"
+              value={pexelsKey}
+              onChange={(e) => setPexelsKey(e.target.value)}
+              placeholder="563492..."
+              className="w-full px-4 py-3 rounded-2xl bg-editor-subtle border border-editor-border focus:border-indigo-500 text-xs text-white outline-none font-mono placeholder:text-slate-500"
+            />
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Enables the treated stock-photo pipeline (background removed, recolored into the deck's own palette) for slides with no user-uploaded image. Leave blank to skip it — decks still render fine without it.
+            </p>
+          </div>
 
           <div className="flex items-center gap-2 text-[10px] text-slate-400">
             <ShieldCheck size={13} className="text-emerald-400 shrink-0" />

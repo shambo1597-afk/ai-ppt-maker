@@ -20,15 +20,40 @@ import { applyDuotone } from './photoTreatment';
 
 const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search';
 
+const PEXELS_LOCALSTORAGE_KEY = 'slidecraft_pexels_key';
+
 /** Mirrors client.ts's resolveGeminiApiKey() pattern exactly: env var
  * first, then a user-supplied localStorage key, so this pipeline can be
  * turned on from within the app without a rebuild. Returns '' (falsy)
  * when nothing is configured — every caller below treats that as "this
- * whole pipeline no-ops", never as an error. */
+ * whole pipeline no-ops", never as an error.
+ *
+ * The env var path (VITE_PEXELS_API_KEY) is a BUILD-time value that Vite
+ * bundles verbatim into the client-side JS — anyone who loads the
+ * deployed app can read it out of the network tab or page source. It's
+ * meant for a developer's own local/self-hosted build, never for a key
+ * pasted into a shared environment. The localStorage path is the one
+ * actually meant for an end user's own key: it's set here, from within
+ * the running app (see AIGeneratorModal.tsx), stored only in that one
+ * browser, and never touches a build, a server, or version control. */
 export function resolvePexelsApiKey(): string {
   const envApiKey = (import.meta.env.VITE_PEXELS_API_KEY || '').trim();
-  const localApiKey = (typeof window !== 'undefined' ? localStorage.getItem('slidecraft_pexels_key') : '') || '';
+  const localApiKey = (typeof window !== 'undefined' ? localStorage.getItem(PEXELS_LOCALSTORAGE_KEY) : '') || '';
   return envApiKey || localApiKey;
+}
+
+/** Persist a user-supplied Pexels key to this browser's localStorage only
+ * — see resolvePexelsApiKey()'s comment on why this, not an env var, is
+ * the right home for a key an end user pastes into the app themselves.
+ * An empty string clears it (same as never having set one). */
+export function savePexelsApiKey(key: string): void {
+  if (typeof window === 'undefined') return;
+  const trimmed = key.trim();
+  if (trimmed) {
+    localStorage.setItem(PEXELS_LOCALSTORAGE_KEY, trimmed);
+  } else {
+    localStorage.removeItem(PEXELS_LOCALSTORAGE_KEY);
+  }
 }
 
 interface PexelsPhoto {
