@@ -52,8 +52,27 @@ export interface SlideContent {
   deckSeed?: number;
 }
 
-function stripBulletPrefix(text: string): string {
-  return text.replace(/^[•*\-0-9.]+\s*/, '').trim();
+/** Strip a real list-marker prefix — `•`/`*`/`+`/`-` bullets, or
+ * `1.`/`1)`-style ordered markers — and nothing else. The previous
+ * pattern (character class `[•*\-0-9.]` followed by a zero-or-more
+ * whitespace quantifier) matched bare digits and periods with no
+ * requirement that they form an actual marker shape — a delimiter
+ * followed by MANDATORY whitespace — and didn't even need trailing
+ * whitespace to fire at all. That silently mangled any bullet whose
+ * title genuinely starts with a number — "16,384 Channels" ->
+ * ",384 Channels" (stripped "16", stopped at the comma since `,` isn't
+ * in the class), "1.2 Gbps" -> "Gbps" (digit, period, digit, space all
+ * matched the class). Requiring an actual delimiter character plus
+ * mandatory whitespace after it means neither of those — nor a real
+ * decimal stat like "3.5% growth rate" — is touched, while "1. Some
+ * heading" and "- Some heading" still lose their real markers.
+ *
+ * Exported (unlike this file's other private helpers) purely for direct
+ * unit coverage — this repo has no test runner configured, so it's
+ * exercised via a standalone verification script rather than a checked-
+ * in test file, but that still requires a real importable binding. */
+export function stripBulletPrefix(text: string): string {
+  return text.replace(/^\s*(?:[•*+-]|\d+[.)])\s+/, '').trim();
 }
 
 /** The non-empty points parseBullets will actually turn into bullets, in

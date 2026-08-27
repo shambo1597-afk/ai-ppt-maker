@@ -9,6 +9,7 @@ import {
 } from '../types/slide';
 import { AssetItem, AssetManagerTab } from '../types/asset';
 import { AIPresentationResponse } from '../types/llm';
+import { stripMarkdownSyntax } from '../lib/parser/markdownStrip';
 import { assetStorage, DEFAULT_PRESET_ASSETS } from '../services/assetStorage';
 import { slideComposer } from '../services/slideComposer';
 import { INITIAL_SLIDES, THEMES } from '../utils/defaultTemplates';
@@ -874,10 +875,17 @@ export const useSlideStore = create<SlideState>((set, get) => ({
     }
 
     if (mode === 'bullets') {
-      // Split into concise bullet points
+      // Split into concise bullet points. stripMarkdownSyntax() (not a
+      // bespoke regex) is the same fix as contentModel.ts's
+      // stripBulletPrefix(): the old /^[-*•#0-9.)\s]+/ character class
+      // matched bare digits/periods with no requirement that they form
+      // an actual marker shape, so a pasted line genuinely starting with
+      // a number ("16,384 Channels supported") got its number mangled
+      // ("16" eaten, stopping at the comma) exactly like the bullet-title
+      // bug it mirrors.
       const lines = content
         .split('\n')
-        .map((l) => l.trim().replace(/^[-*•#0-9.)\s]+/, ''))
+        .map((l) => stripMarkdownSyntax(l.trim()))
         .filter((l) => l.length > 2)
         .slice(0, 5);
 
