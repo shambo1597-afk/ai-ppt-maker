@@ -1,6 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
-const apiKey = 'AIzaSyBpg6NBSo1WsPdvmBOiY7vqWcE_Xen9iHM';
+// Never hardcode a credential here — see scripts/README.md. Read from the
+// environment only; both var names are accepted since the app itself reads
+// VITE_GEMINI_API_KEY (see src/lib/llm/client.ts's resolveGeminiApiKey())
+// but a plain GEMINI_API_KEY is the more conventional name for a script
+// that isn't going through Vite's env handling at all.
+const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('Missing API key: set VITE_GEMINI_API_KEY or GEMINI_API_KEY in your environment before running this script.');
+  process.exit(1);
+}
 console.log('Testing GoogleGenAI with key:', apiKey.slice(0, 8) + '...');
 
 async function test() {
