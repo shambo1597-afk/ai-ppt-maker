@@ -5,7 +5,7 @@ import { getIconDataUrl } from '../lib/assets/iconFetcher';
 import { inferIconForText } from '../utils/iconHelper';
 import { resolveThemeTokens, ThemeTokens } from '../lib/design/tokens';
 import { buildSlideContent, nonEmptyPoints } from '../lib/engine/contentModel';
-import { composeSlide, isHeroSurface, detectRegime } from '../lib/engine/composer';
+import { composeSlide, resolveSlideBackground, detectRegime } from '../lib/engine/composer';
 import { generateNoiseTextureDataUrl, hashStringSeed } from '../lib/engine/texture';
 import { CANVAS_W, CANVAS_H } from '../lib/engine/grid';
 import { fetchTreatedPhoto, deriveSearchQuery } from '../lib/assets/stockPhotoFetcher';
@@ -133,7 +133,7 @@ export const slideComposer = {
       if (textureDataUrl) {
         elements.unshift(buildTextureOverlay(textureDataUrl));
       }
-      const slideBg = isHeroSurface(content) ? theme.heroBg : theme.canvasBg;
+      const slideBg = resolveSlideBackground(content, theme);
 
       compiledSlides.push({
         id: `ai-slide-${Date.now()}-${i}`,
