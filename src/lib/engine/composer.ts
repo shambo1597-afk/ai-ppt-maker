@@ -1,6 +1,8 @@
 import { SlideElement, TextElement, ShapeElement, ImageElement, IconElement } from '../../types/slide';
 import { ThemeTokens } from '../design/tokens';
 import { mixHex } from '../design/colorMath';
+import { derivePolarityFlip, PolarityOverride } from '../design/themeGenerator';
+import { seededRandom } from '../utils/prng';
 import { SlideContent, SlideBullet } from './contentModel';
 import { Box, CANVAS_H, getContentBox, stackGap, columnGutter, splitBox, computeGrid } from './grid';
 import { autoFitFontSize, autoFitSingleLineFontSize, baseTitleSize, baseBodySize, estimateTextHeight } from './typography';
@@ -103,14 +105,22 @@ interface Surface {
   isSomber: boolean;
 }
 
-function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
+/**
+ * `polarityOverride`, when given (see maybeFlipPolarity() below), replaces
+ * fg/muted outright — a deliberate per-slide break from what isHero alone
+ * would otherwise pick, e.g. a dark STAT slide inside an overall light
+ * deck. accent/fonts/etc. are untouched by a flip: only the canvas
+ * polarity and its matching text color change, never the deck's accent
+ * hue or type choices.
+ */
+function resolveSurface(theme: ThemeTokens, isHero: boolean, polarityOverride?: PolarityOverride): Surface {
   return {
     isHero,
-    fg: isHero ? theme.textHero : theme.textPrimary,
+    fg: polarityOverride ? polarityOverride.fg : isHero ? theme.textHero : theme.textPrimary,
     // Every color in the scene graph must be a plain hex the PPTX exporter
     // can round-trip — no rgba()/CSS color functions — so "muted white on
     // a dark hero surface" is a real blended hex, not an alpha channel.
-    muted: isHero ? mixHex('#FFFFFF', theme.heroBg, 0.35) : theme.textMuted,
+    muted: polarityOverride ? polarityOverride.muted : isHero ? mixHex('#FFFFFF', theme.heroBg, 0.35) : theme.textMuted,
     accent: theme.accent,
     accentBadge: theme.accentBadge || theme.accent,
     fontHeading: theme.fontHeading,
@@ -118,6 +128,58 @@ function resolveSurface(theme: ThemeTokens, isHero: boolean): Surface {
     displayFontWeight: theme.displayWeight === 'light' ? '300' : '900',
     isSomber: theme.gravity === 'somber',
   };
+}
+
+/**
+ * Deterministic per-slide polarity-flip decision — the mechanism behind
+ * the occasional "dark hero stat slide breaking up an otherwise light
+ * deck" moment. Only ever considered for STAT or QUOTE regimes (high-
+ * impact, low-density moments that can afford a surface swap); TITLE,
+ * GRID, and any TYPOGRAPHIC slide with real body text keep the deck's
+ * dominant, denser-text-friendly polarity unconditionally.
+ *
+ * Seeded by deckSeed + this slide's own index (not Math.random()), so a
+ * given deck always flips the same slide the same way on every render —
+ * never re-rolled. A somber-gravity deck flips at a small fraction of the
+ * normal rate: a dramatic light/dark swing reads as energetic, which
+ * somber content shouldn't get (see themeGenerator.ts's Gravity axis).
+ *
+ * Returns undefined (no flip) far more often than not by design — this
+ * is an occasional accent, never a rule.
+ */
+function maybeFlipPolarity(content: SlideContent, theme: ThemeTokens): PolarityOverride | undefined {
+  const regime = detectRegime(content);
+  if (regime !== 'stat' && regime !== 'quote') return undefined;
+  if (content.deckSeed === undefined) return undefined;
+
+  const flipOdds = theme.gravity === 'somber' ? 0.03 : 0.3;
+  // Offset by a prime multiple of the slide index so consecutive slides
+  // don't draw from correlated positions in the same underlying sequence
+  // — seededRandom() is deterministic per starting seed, not per call, so
+  // two slides sharing a seed would otherwise roll identical numbers.
+  const rand = seededRandom((content.deckSeed + content.index * 104729) >>> 0);
+  if (rand() >= flipOdds) return undefined;
+
+  // The slide's own baseline — never theme.canvasBg directly, since a
+  // QUOTE's baseline is always theme.heroBg regardless of canvas polarity
+  // (see derivePolarityFlip()'s doc comment for why this distinction is
+  // load-bearing, not cosmetic).
+  const baselineBg = isHeroSurface(content) ? theme.heroBg : theme.canvasBg;
+  return derivePolarityFlip(theme, baselineBg, rand);
+}
+
+/**
+ * The single authoritative "what background does this slide sit on"
+ * decision — used by slideComposer.ts for the actual slide background
+ * fill, and internally by composeSlide() for text-surface resolution, so
+ * the two can never disagree (both call this same pure function with the
+ * same content/theme and get the same deterministic answer, rather than
+ * duplicating the isHero-vs-flip logic in two places).
+ */
+export function resolveSlideBackground(content: SlideContent, theme: ThemeTokens): string {
+  const override = maybeFlipPolarity(content, theme);
+  if (override) return override.bg;
+  return isHeroSurface(content) ? theme.heroBg : theme.canvasBg;
 }
 
 function toPosterPalette(surface: Surface): PosterPalette {
@@ -796,8 +858,29 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
     };
   });
 
+  // GRID cards were uniform plain-white rectangles with zero connection to
+  // the deck's own palette. designGrammar.json has no dedicated card/
+  // surface-treatment signal to ground this in (its contrastPairs and
+  // gradientPairs/gradientRule are page-level background relationships,
+  // mined for a different purpose — deriveGradient() is tuned to produce a
+  // second *gradient stop*, roughly as far from its base as accentBadge or
+  // an ambient blob's tint, which reads as a strong midtone panel behind
+  // text, not the soft wash a card face needs) — so this instead reuses
+  // mixHex()'s "soften toward white" idiom this file and themeGenerator.ts
+  // already lean on everywhere else for a subtle derived tone (textMuted,
+  // border, the polarity-flip's own `muted` field). One card per grid gets
+  // the tinted treatment, chosen deterministically from the deck's own
+  // seed — exactly like the polarity-flip and ambient-blob mechanics above,
+  // never Math.random, so it stays stable across re-renders instead of
+  // reshuffling on every repaint.
+  const highlightRand = seededRandom(((content.deckSeed ?? 0) + content.index * 91387) >>> 0);
+  const highlightCardIdx = Math.floor(highlightRand() * content.bullets.length);
+  const cardTint = mixHex(surface.accent, '#FFFFFF', 0.9);
+  const cardTintBorder = mixHex(surface.accent, '#FFFFFF', 0.55);
+
   content.bullets.forEach((bullet: SlideBullet, idx: number) => {
     const cell = cells[idx];
+    const isHighlightCard = idx === highlightCardIdx;
     elements.push(
       mkShape({
         x: cell.x,
@@ -805,8 +888,8 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
         width: cell.width,
         height: cell.height,
         shapeType: 'roundRect',
-        fillColor: '#FFFFFF',
-        borderColor: '#E2E8F0',
+        fillColor: isHighlightCard ? cardTint : '#FFFFFF',
+        borderColor: isHighlightCard ? cardTintBorder : '#E2E8F0',
         borderWidth: 1,
         borderRadius: 16,
         zIndex: 1,
@@ -1033,7 +1116,7 @@ export function detectRegime(content: SlideContent): Regime {
  */
 export function composeSlide(content: SlideContent, theme: ThemeTokens): SlideElement[] {
   const box = getContentBox();
-  const surface = resolveSurface(theme, isHeroSurface(content));
+  const surface = resolveSurface(theme, isHeroSurface(content), maybeFlipPolarity(content, theme));
 
   switch (detectRegime(content)) {
     case 'title':

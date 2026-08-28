@@ -1,7 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { getDesignSchoolSystemPrompt } from '../src/lib/llm/designSchoolGuidelines.ts';
 
-const apiKey = 'AIzaSyBpg6NBSo1WsPdvmBOiY7vqWcE_Xen9iHM';
+// Never hardcode a credential here — see scripts/README.md.
+const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('Missing API key: set VITE_GEMINI_API_KEY or GEMINI_API_KEY in your environment before running this script.');
+  process.exit(1);
+}
 const systemPrompt = getDesignSchoolSystemPrompt();
 
 async function run() {

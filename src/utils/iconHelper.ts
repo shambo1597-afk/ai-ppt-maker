@@ -10,38 +10,39 @@ export interface IconItem {
 
 export const ICON_LIBRARY: IconItem[] = [
   // Business & Finance
-  { name: 'TrendingUp', category: 'Business', tags: ['growth', 'chart', 'profit', 'sales'] },
-  { name: 'DollarSign', category: 'Business', tags: ['money', 'revenue', 'finance', 'cost'] },
+  { name: 'TrendingUp', category: 'Business', tags: ['growth', 'chart', 'profit', 'sales', 'increase', 'expansion'] },
+  { name: 'DollarSign', category: 'Business', tags: ['money', 'revenue', 'finance', 'cost', 'income', 'earnings'] },
   { name: 'Briefcase', category: 'Business', tags: ['work', 'portfolio', 'job', 'corporate'] },
   { name: 'CreditCard', category: 'Business', tags: ['payment', 'billing', 'transaction'] },
-  { name: 'PieChart', category: 'Business', tags: ['analytics', 'data', 'graph', 'breakdown'] },
-  { name: 'BarChart3', category: 'Business', tags: ['metrics', 'statistics', 'performance'] },
+  { name: 'PieChart', category: 'Business', tags: ['analytics', 'data', 'graph', 'breakdown', 'proportion', 'share'] },
+  { name: 'BarChart3', category: 'Business', tags: ['metrics', 'statistics', 'performance', 'benchmark', 'throughput'] },
   { name: 'Target', category: 'Business', tags: ['goal', 'objective', 'mission', 'focus'] },
   { name: 'Award', category: 'Business', tags: ['winner', 'prize', 'quality', 'badge'] },
   { name: 'Building2', category: 'Business', tags: ['company', 'enterprise', 'office'] },
   { name: 'Coins', category: 'Business', tags: ['wealth', 'crypto', 'cash', 'savings'] },
 
   // Tech & Development
-  { name: 'Cpu', category: 'Technology', tags: ['processor', 'hardware', 'chip', 'ai'] },
+  { name: 'Cpu', category: 'Technology', tags: ['processor', 'hardware', 'chip', 'ai', 'compute', 'silicon'] },
   { name: 'Zap', category: 'Technology', tags: ['fast', 'speed', 'energy', 'lightning'] },
-  { name: 'ShieldCheck', category: 'Technology', tags: ['security', 'protect', 'safe', 'audit'] },
+  { name: 'ShieldCheck', category: 'Technology', tags: ['security', 'protect', 'safe', 'audit', 'compliance', 'verified'] },
   { name: 'Cloud', category: 'Technology', tags: ['hosting', 'server', 'aws', 'saas'] },
-  { name: 'Server', category: 'Technology', tags: ['database', 'datacenter', 'backend'] },
+  { name: 'Server', category: 'Technology', tags: ['database', 'datacenter', 'backend', 'infrastructure', 'node'] },
   { name: 'Database', category: 'Technology', tags: ['storage', 'sql', 'records', 'data'] },
   { name: 'Code2', category: 'Technology', tags: ['programming', 'developer', 'software'] },
   { name: 'Terminal', category: 'Technology', tags: ['console', 'cli', 'command', 'bash'] },
-  { name: 'Layers', category: 'Technology', tags: ['stack', 'architecture', 'structure'] },
+  { name: 'Layers', category: 'Technology', tags: ['stack', 'architecture', 'structure', 'depth', 'tier'] },
   { name: 'GitBranch', category: 'Technology', tags: ['version', 'code', 'repository'] },
   { name: 'Lock', category: 'Technology', tags: ['privacy', 'encryption', 'security'] },
-  { name: 'Bot', category: 'Technology', tags: ['ai', 'robot', 'agent', 'automation'] },
+  { name: 'Bot', category: 'Technology', tags: ['ai', 'robot', 'agent', 'automation', 'autonomous'] },
   { name: 'Sparkles', category: 'Technology', tags: ['magic', 'ai', 'generate', 'new'] },
   { name: 'Boxes', category: 'Technology', tags: ['microservices', 'kubernetes', 'containers'] },
+  { name: 'Wifi', category: 'Technology', tags: ['connectivity', 'wireless', 'network', 'bandwidth'] },
 
   // Interface & Arrows
   { name: 'ArrowRight', category: 'Interface', tags: ['next', 'forward', 'pointer'] },
   { name: 'CheckCircle2', category: 'Interface', tags: ['success', 'done', 'approved', 'yes'] },
-  { name: 'Clock', category: 'Interface', tags: ['time', 'history', 'schedule', 'speed'] },
-  { name: 'Globe', category: 'Interface', tags: ['worldwide', 'international', 'web', 'network'] },
+  { name: 'Clock', category: 'Interface', tags: ['time', 'history', 'schedule', 'duration', 'latency'] },
+  { name: 'Globe', category: 'Interface', tags: ['worldwide', 'international', 'web', 'network', 'coverage', 'global'] },
   { name: 'Users', category: 'Interface', tags: ['team', 'people', 'customers', 'community'] },
   { name: 'UserCheck', category: 'Interface', tags: ['verified', 'member', 'profile'] },
   { name: 'Share2', category: 'Interface', tags: ['social', 'distribute', 'send'] },
@@ -49,7 +50,7 @@ export const ICON_LIBRARY: IconItem[] = [
   { name: 'Search', category: 'Interface', tags: ['find', 'lookup', 'discover'] },
   { name: 'Settings', category: 'Interface', tags: ['configure', 'options', 'gear'] },
   { name: 'Bell', category: 'Interface', tags: ['alert', 'notification', 'alarm'] },
-  { name: 'Calendar', category: 'Interface', tags: ['date', 'event', 'roadmap'] },
+  { name: 'Calendar', category: 'Interface', tags: ['date', 'event', 'roadmap', 'phase', 'timeline'] },
   { name: 'Mail', category: 'Interface', tags: ['contact', 'email', 'message'] },
   { name: 'Phone', category: 'Interface', tags: ['call', 'support', 'contact'] },
   { name: 'MapPin', category: 'Interface', tags: ['location', 'place', 'hq'] },
@@ -57,7 +58,27 @@ export const ICON_LIBRARY: IconItem[] = [
   { name: 'Heart', category: 'Interface', tags: ['like', 'love', 'favorite'] },
   { name: 'Star', category: 'Interface', tags: ['rating', 'featured', 'review'] },
   { name: 'Lightbulb', category: 'Interface', tags: ['idea', 'innovation', 'solution'] },
-  { name: 'Rocket', category: 'Interface', tags: ['launch', 'startup', 'scale', 'fast'] },
+  { name: 'Rocket', category: 'Interface', tags: ['launch', 'startup', 'scale', 'fast', 'deployment', 'mission'] },
+
+  // Science & Engineering — real fixture briefs skew heavily toward
+  // aerospace/biotech/materials-science vocabulary (see
+  // test/fixtures/stratospheric-brief.md) that the original four
+  // categories above had essentially no coverage for; every bullet using
+  // this vocabulary fell straight through to null (the slide's own
+  // single fallback icon) regardless of how different two bullets'
+  // actual subject matter was.
+  { name: 'Atom', category: 'Science', tags: ['physics', 'quantum', 'particle', 'atomic', 'molecular'] },
+  { name: 'FlaskConical', category: 'Science', tags: ['chemistry', 'biotech', 'lab', 'experiment', 'formula'] },
+  { name: 'Microscope', category: 'Science', tags: ['research', 'analysis', 'biology', 'genomic', 'study'] },
+  { name: 'Dna', category: 'Science', tags: ['genetic', 'genome', 'biology', 'sequence'] },
+  { name: 'Thermometer', category: 'Science', tags: ['temperature', 'thermal', 'heat', 'climate'] },
+  { name: 'Wind', category: 'Science', tags: ['aerodynamic', 'airflow', 'wind', 'atmosphere', 'atmospheric'] },
+  { name: 'Satellite', category: 'Science', tags: ['orbit', 'space', 'satellite', 'aerospace', 'altitude'] },
+  { name: 'Waves', category: 'Science', tags: ['signal', 'frequency', 'wave', 'wireless', 'radio'] },
+  { name: 'Battery', category: 'Science', tags: ['power', 'energy', 'battery', 'endurance', 'charge'] },
+  { name: 'HeartPulse', category: 'Science', tags: ['health', 'medical', 'vital', 'pulse', 'clinical'] },
+  { name: 'Leaf', category: 'Science', tags: ['sustainable', 'organic', 'ecological', 'renewable', 'carbon'] },
+  { name: 'Gauge', category: 'Science', tags: ['pressure', 'reading', 'sensor', 'measurement', 'output'] },
 ];
 
 /** "Building2" -> "building-2" — the inverse of kebabToPascalCase below,
@@ -76,21 +97,44 @@ function pascalToKebab(name: string): string {
  * curated tags — the same "keyword -> icon" idea ruleBasedGenerator.ts
  * already uses for whole-slide icon selection, extended to per-item
  * granularity. Word-boundary matching (not substring) so a tag like
- * "time" doesn't fire inside "sometimes" or "timeline". Deterministic:
- * first match in ICON_LIBRARY order wins. Returns a kebab-case id ready
- * for iconFetcher.ts's getIconDataUrl, or null when nothing matches —
- * callers should fall back to the slide's own icon rather than guess.
+ * "time" doesn't fire inside "sometimes" or "timeline". Returns a
+ * kebab-case id ready for iconFetcher.ts's getIconDataUrl, or null when
+ * nothing matches at all — callers should fall back to the slide's own
+ * icon rather than guess.
+ *
+ * `usedIcons`, when given, is the set of icon ids (kebab-case, matching
+ * this function's own return shape) already assigned to OTHER bullets on
+ * this same slide/deck — callers should accumulate into the same Set
+ * across all their inferIconForText() calls for one slide. Real Canva
+ * samples use a distinct icon per card, not one icon repeated across
+ * every card, so: among every tag match (not just the first, unlike the
+ * plain first-match-wins this used to be), an unused one wins; if every
+ * direct tag match is already used, an unused icon from the SAME
+ * category as the best match is preferred over an exact repeat — a
+ * thematically-adjacent icon (even one whose own tags didn't happen to
+ * match this text) still reads as more varied than the identical icon
+ * showing up twice on one slide. Only once that category's pool is also
+ * exhausted does this fall back to repeating the best direct match.
  */
-export function inferIconForText(text: string): string | null {
+export function inferIconForText(text: string, usedIcons?: Set<string>): string | null {
   if (!text) return null;
   const words = new Set(text.toLowerCase().match(/[a-z0-9]+/g) || []);
   if (words.size === 0) return null;
-  for (const item of ICON_LIBRARY) {
-    if (item.tags.some((tag) => words.has(tag))) {
-      return pascalToKebab(item.name);
-    }
-  }
-  return null;
+
+  const directMatches = ICON_LIBRARY.filter((item) => item.tags.some((tag) => words.has(tag)));
+  if (directMatches.length === 0) return null;
+  if (!usedIcons) return pascalToKebab(directMatches[0].name);
+
+  const unusedDirect = directMatches.find((item) => !usedIcons.has(pascalToKebab(item.name)));
+  if (unusedDirect) return pascalToKebab(unusedDirect.name);
+
+  const bestCategory = directMatches[0].category;
+  const unusedInCategory = ICON_LIBRARY.find(
+    (item) => item.category === bestCategory && !usedIcons.has(pascalToKebab(item.name))
+  );
+  if (unusedInCategory) return pascalToKebab(unusedInCategory.name);
+
+  return pascalToKebab(directMatches[0].name);
 }
 
 /**

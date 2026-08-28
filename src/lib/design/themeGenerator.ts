@@ -78,6 +78,58 @@ function deriveTextColor(bgHex: string, hue: number, rand: () => number): string
   return hslToHex({ h: hue, s, l });
 }
 
+/** A background+text pair at one specific light/dark polarity, for
+ * overriding a single slide's surface away from whatever it would
+ * otherwise render at — see composer.ts's per-slide polarity-flip
+ * mechanic (STAT/QUOTE regimes only). Deliberately just bg/fg/muted, not
+ * a second ThemeTokens: accent/fonts/etc. stay constant across the flip,
+ * only the canvas polarity and its matching text color change. */
+export interface PolarityOverride {
+  bg: string;
+  fg: string;
+  muted: string;
+}
+
+/**
+ * Derive a background+text pair at the OPPOSITE light/dark polarity from
+ * `baselineBg` — the background this specific slide would render on
+ * *without* a flip — reusing the theme's own hue (read back off
+ * `baselineBg`) rather than rolling a fresh, unrelated one, so a flipped
+ * slide still visibly belongs to the same deck.
+ *
+ * Takes the slide's own baseline, not theme.canvasBg directly, because
+ * they're not the same thing for every regime: a QUOTE slide's baseline
+ * is always theme.heroBg (dark), regardless of the deck's dominant
+ * canvas polarity (see composer.ts's isHeroSurface()) — flipping "away
+ * from canvasBg's polarity" would be a silent no-op for a quote in a
+ * light-canvas deck, since canvasBg is light but the quote's own
+ * baseline was already dark and stays dark either way.
+ *
+ * - Baseline is dark (a dark-canvas deck's STAT slide, or ANY deck's
+ *   QUOTE slide, which is always hero/dark by default) -> flip means
+ *   light, derived with the exact same hue/saturation/lightness window
+ *   generateTheme()'s own light canvasBg uses, just computed on demand.
+ * - Baseline is light (a light-canvas deck's STAT slide — the only case
+ *   where this happens, since QUOTE is never light by default) -> flip
+ *   means dark. Reuses the theme's own heroBg/textHero outright rather
+ *   than deriving a third dark tone — the title slide already sits on
+ *   that exact surface, so a flipped STAT slide matches an existing
+ *   color in the deck instead of introducing a new one.
+ */
+export function derivePolarityFlip(theme: ThemeTokens, baselineBg: string, rand: () => number): PolarityOverride {
+  const baselineHsl = hexToHsl(baselineBg);
+  const hue = baselineHsl ? baselineHsl.h : hexToHsl(theme.canvasBg)?.h ?? 0;
+  const baselineIsDark = baselineHsl ? baselineHsl.l < 0.5 : true;
+
+  if (baselineIsDark) {
+    const bg = hslToHex({ h: hue, s: 0.06 + rand() * 0.3, l: 0.95 + rand() * 0.02 });
+    const fg = deriveTextColor(bg, hue, rand);
+    return { bg, fg, muted: mixHex(fg, bg, 0.42) };
+  }
+
+  return { bg: theme.heroBg, fg: theme.textHero, muted: mixHex('#FFFFFF', theme.heroBg, 0.35) };
+}
+
 export function generateTheme(options: GenerateThemeOptions = {}): ThemeTokens {
   const rand = options.rand || Math.random;
   const gravity: Gravity = options.gravity || 'neutral';
