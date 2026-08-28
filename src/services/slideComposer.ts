@@ -74,23 +74,46 @@ export const slideComposer = {
       // necessarily the numbered badge composeGrid() falls back to) — so
       // for a slide with enough points to actually become a grid, try to
       // match each bullet's own text to a real icon (inferIconForText,
-      // reusing iconHelper.ts's curated tag table) and fetch it. Fired
-      // concurrently: sequential per-bullet fetches would multiply
+      // reusing iconHelper.ts's curated tag table). Selection happens in
+      // one sequential pass (`usedIcons` accumulates as each bullet picks
+      // its icon, so bullet 2 knows what bullet 1 already took, and can
+      // fall back to an unused same-category icon or, last resort, repeat
+      // — see inferIconForText()'s own doc comment) — this is pure/
+      // synchronous, no network cost to serializing it. Only the actual
+      // SVG *fetch* for each chosen name is fired concurrently
+      // (Promise.all below): sequential per-bullet fetches would multiply
       // getIconDataUrl's worst-case network timeout by bullet count.
-      // Falls back to this slide's own icon per-bullet when a bullet's
-      // text doesn't match any tag, and composeGrid() falls back further
-      // (to the plain numbered badge) only if literally none matched.
+      //
+      // A bullet whose text matches no tag at all (inferred === null) falls
+      // back to this slide's own icon — but only the FIRST such bullet on
+      // this slide. A second, third, etc. null-match bullet would otherwise
+      // all share that exact same fallback icon — the same duplicate-icon
+      // problem this whole block exists to prevent, just reached via the
+      // no-match path instead of the tag-collision path. Past the first,
+      // they get undefined instead, so composeGrid() falls through to its
+      // own numbered-pill treatment (01, 02, 03...) — visually distinct by
+      // number, never a repeated icon graphic.
       const points = nonEmptyPoints(aiSlide.points);
       let bulletIconSvgData: (string | undefined)[] = [];
       if (points.length >= 2) {
+        const usedIcons = new Set<string>();
+        const inferredNames = points.map((point) => {
+          const inferred = inferIconForText(point, usedIcons);
+          if (inferred) usedIcons.add(inferred);
+          return inferred;
+        });
+        let sharedFallbackUsed = false;
         bulletIconSvgData = await Promise.all(
-          points.map(async (point) => {
-            const inferred = inferIconForText(point);
-            if (!inferred) return iconSvgData || undefined;
+          inferredNames.map(async (inferred) => {
+            if (!inferred) {
+              if (sharedFallbackUsed) return undefined;
+              sharedFallbackUsed = true;
+              return iconSvgData || undefined;
+            }
             try {
               return await getIconDataUrl(inferred, theme.accent);
             } catch {
-              return iconSvgData || undefined;
+              return sharedFallbackUsed ? undefined : ((sharedFallbackUsed = true), iconSvgData || undefined);
             }
           })
         );
