@@ -58,6 +58,18 @@ HARD RULES, no exceptions:
   at the user's own boundaries (line breaks, existing bullet markers,
   semicolons), never invent a title prefix like "Phase 1 Title:" that wasn't
   literally written in the chunk.
+- List-marker style is NOT a signal for whether something is a list. A
+  section with 2+ parallel structured items is "points" material regardless
+  of whether the source marked them with "-", "*", or "1." / "1)" / "2." /
+  "2)" — a numbered list ("1. First pillar: ...  2. Second pillar: ...  3.
+  Third pillar: ...") is structurally identical to a bulleted one and must
+  be classified into "points" the same way, never flattened into a single
+  "body" paragraph just because it happened to use numbers instead of
+  bullets. You still keep full freedom to use "body" (flowing prose, no
+  "points") for a section that is genuinely one continuous argument with no
+  parallel enumerated items — the test is the source's own structure (does
+  it already break into 2+ parallel items with their own boundaries?), never
+  which marker character it used.
 - "statValue" / "statLabel": use ONLY when the chunk's own ENTIRE point is one
   single standout metric (e.g. a literal "68%" or "$4.2M" in the source).
   statLabel must itself be an excerpt from the chunk describing that metric —
