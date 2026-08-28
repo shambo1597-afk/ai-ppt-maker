@@ -858,8 +858,29 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
     };
   });
 
+  // GRID cards were uniform plain-white rectangles with zero connection to
+  // the deck's own palette. designGrammar.json has no dedicated card/
+  // surface-treatment signal to ground this in (its contrastPairs and
+  // gradientPairs/gradientRule are page-level background relationships,
+  // mined for a different purpose — deriveGradient() is tuned to produce a
+  // second *gradient stop*, roughly as far from its base as accentBadge or
+  // an ambient blob's tint, which reads as a strong midtone panel behind
+  // text, not the soft wash a card face needs) — so this instead reuses
+  // mixHex()'s "soften toward white" idiom this file and themeGenerator.ts
+  // already lean on everywhere else for a subtle derived tone (textMuted,
+  // border, the polarity-flip's own `muted` field). One card per grid gets
+  // the tinted treatment, chosen deterministically from the deck's own
+  // seed — exactly like the polarity-flip and ambient-blob mechanics above,
+  // never Math.random, so it stays stable across re-renders instead of
+  // reshuffling on every repaint.
+  const highlightRand = seededRandom(((content.deckSeed ?? 0) + content.index * 91387) >>> 0);
+  const highlightCardIdx = Math.floor(highlightRand() * content.bullets.length);
+  const cardTint = mixHex(surface.accent, '#FFFFFF', 0.9);
+  const cardTintBorder = mixHex(surface.accent, '#FFFFFF', 0.55);
+
   content.bullets.forEach((bullet: SlideBullet, idx: number) => {
     const cell = cells[idx];
+    const isHighlightCard = idx === highlightCardIdx;
     elements.push(
       mkShape({
         x: cell.x,
@@ -867,8 +888,8 @@ function composeGrid(content: SlideContent, box: Box, surface: Surface): SlideEl
         width: cell.width,
         height: cell.height,
         shapeType: 'roundRect',
-        fillColor: '#FFFFFF',
-        borderColor: '#E2E8F0',
+        fillColor: isHighlightCard ? cardTint : '#FFFFFF',
+        borderColor: isHighlightCard ? cardTintBorder : '#E2E8F0',
         borderWidth: 1,
         borderRadius: 16,
         zIndex: 1,
